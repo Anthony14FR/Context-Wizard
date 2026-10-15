@@ -1,0 +1,65 @@
+[repository]
+name = "social-app"
+url = "https://github.com/bluesky-social/social-app"
+sha = "c50fc7e1e6bec6cdab02ae1cc4a2544fb783bdff"
+stack = "React Native with Expo (TypeScript)"
+
+[[task]]
+id = "social-app-01"
+kind = "locate"
+prompt = "Which constant sets the maximum post length in graphemes, and which component file draws the composer's character-count progress indicator? Answer concisely with the constant name and file path."
+answer_contains = ["MAX_GRAPHEME_LENGTH", "src/view/com/composer/char-progress/CharProgress.tsx"]
+
+[[task]]
+id = "social-app-02"
+kind = "locate"
+prompt = "Post likes and reposts are toggled through a queued mutation. Which hook and file implement the like queue, and which generic hook file does it build on? Name the paths concisely."
+answer_contains = ["usePostLikeMutationQueue", "src/lib/hooks/useToggleMutationQueue.ts"]
+
+[[task]]
+id = "social-app-03"
+kind = "locate"
+prompt = "Where is the zod schema for the app's locally persisted state defined, and which file is the web-specific implementation of persisted storage? Give the file paths."
+answer_contains = ["src/state/persisted/schema.ts", "src/state/persisted/index.web.ts"]
+
+[[task]]
+id = "social-app-04"
+kind = "locate"
+prompt = "Which file contains the session reducer and its Action type, and which file wraps that reducer to add logging? Give the paths."
+answer_contains = ["src/state/session/reducer.ts", "src/state/session/logging.ts"]
+
+[[task]]
+id = "social-app-05"
+kind = "locate"
+prompt = "Which file defines the FeedTuner class that filters and reshapes feed slices, and which query file for the post feed imports and uses it? Answer with paths."
+answer_contains = ["src/lib/api/feed-manip.ts", "src/state/queries/post-feed.ts"]
+
+[[task]]
+id = "social-app-06"
+kind = "locate"
+prompt = "Where is the URL path pattern for the hashtag route declared, and which file holds the screen component rendered for it? Name the files."
+answer_contains = ["src/routes.ts", "src/screens/Hashtag.tsx"]
+
+[[task]]
+id = "social-app-07"
+kind = "locate"
+prompt = "Which hook gates actions behind a verified email, and which state file provides the email context it reads? Give the file paths."
+answer_contains = ["src/lib/hooks/useRequireEmailVerification.tsx", "src/state/email-verification.tsx"]
+
+[[task]]
+id = "social-app-08"
+kind = "edit"
+prompt = "Direct messages are limited to 1000 graphemes. Lower that limit to 500 by changing the constant where it is defined."
+check = "grep -q 'MAX_DM_GRAPHEME_LENGTH = 500' src/lib/constants.ts"
+
+[[task]]
+id = "social-app-09"
+kind = "edit"
+prompt = "The unread notification badge cap is currently 100. Change it to 50 in the constant that defines it."
+check = "grep -q 'UNREAD_NOTIFICATION_CAP = 50' src/lib/constants.ts"
+
+[[task]]
+id = "social-app-10"
+kind = "edit"
+prompt = "Users can subscribe to at most 20 labelers. Reduce that maximum to 10 in the constant that defines it."
+check = "grep -q 'MAX_LABELERS = 10' src/lib/constants.ts"
