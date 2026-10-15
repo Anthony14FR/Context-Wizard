@@ -1,0 +1,7 @@
+[ -n "${CLAUDE_PLUGIN_DATA:-}" ] || exit 0
+wizard_bin="${CLAUDE_PLUGIN_DATA}/bin/wizard"
+case "$(uname -s)" in
+  MINGW* | MSYS* | CYGWIN*) wizard_bin="${wizard_bin}.exe" ;;
+esac
+[ -x "$wizard_bin" ] || exit 0
+exec "$wizard_bin" hook

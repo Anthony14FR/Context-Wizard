@@ -9,3 +9,4 @@ Decisions are recorded as described in [ADR 0001](0001-record-architecture-decis
 | [0003](0003-per-project-opt-in-stored-in-repository.md) | Per-project opt-in stored in the repository | Accepted |
 | [0004](0004-in-house-graph-ranking-and-token-estimator.md) | In-house graph ranking and token estimator | Accepted |
 | [0005](0005-tree-sitter-language-pack-for-grammars.md) | tree-sitter-language-pack for grammars | Accepted |
+| [0006](0006-hook-launchers-and-binary-location.md) | Hook launchers and binary location | Accepted |
