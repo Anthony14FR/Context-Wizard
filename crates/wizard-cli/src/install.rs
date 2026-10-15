@@ -28,6 +28,25 @@ pub(crate) fn plugin_id() -> Option<String> {
     Some(format!("{PLUGIN_NAME}@{marketplace}"))
 }
 
+/// Returns `true` when the plugin that launched this binary declares a different version.
+///
+/// The plugin and the binary are released together, so a mismatch means the plugin was updated
+/// and its binary is not installed yet: hooks then stay inert until the launcher installs it.
+/// Without `CLAUDE_PLUGIN_ROOT`, as when the binary is run by hand, there is no mismatch.
+pub(crate) fn version_mismatch() -> bool {
+    let Some(root) = env::var_os("CLAUDE_PLUGIN_ROOT").filter(|root| !root.is_empty()) else {
+        return false;
+    };
+    let manifest = PathBuf::from(root)
+        .join(".claude-plugin")
+        .join("plugin.json");
+    let declared = std::fs::read_to_string(manifest)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|manifest| manifest.get("version")?.as_str().map(str::to_owned));
+    declared.is_some_and(|version| version != wizard_core::VERSION)
+}
+
 fn marketplace_from_data_dir(name: &str) -> Option<&str> {
     name.strip_prefix(PLUGIN_NAME)?
         .strip_prefix('-')

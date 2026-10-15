@@ -12,6 +12,7 @@ use serde_json::json;
 use wizard_core::decision::{self, State};
 
 use crate::event::{Event, EventName};
+use crate::install;
 use crate::opt_in;
 
 const MAX_INPUT_BYTES: u64 = 8 * 1024 * 1024;
@@ -35,6 +36,9 @@ pub(crate) fn run() -> ExitCode {
 }
 
 fn respond(event: &Event) -> Option<String> {
+    if install::version_mismatch() {
+        return None;
+    }
     let project = project_dir(event)?;
     match decision::load(&project).ok()? {
         State::Undecided if event.hook_event_name == EventName::UserPromptSubmit => {
