@@ -1,0 +1,186 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, without the leading v (for example 0.2.0)
+        required: true
+      dry_run:
+        description: Build and checksum every target without tagging or publishing
+        type: boolean
+        default: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  prepare:
+    name: Prepare version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      branch: ${{ steps.branch.outputs.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check the version
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "invalid version $VERSION"; exit 1; }
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null; then
+            echo "tag v$VERSION already exists"; exit 1
+          fi
+      - run: rustup toolchain install
+      - name: Bump the crate version
+        run: |
+          sed -i "0,/^version = \".*\"$/s//version = \"$VERSION\"/" Cargo.toml
+          cargo update --workspace --offline || cargo update --workspace
+      - id: branch
+        name: Push the release branch
+        run: |
+          name="release/v$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$name"
+          git commit -am "chore(release): set version $VERSION"
+          if [ "${{ inputs.dry_run }}" = "false" ]; then
+            git push origin "$name"
+          fi
+          git bundle create release.bundle "$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-branch
+          path: release.bundle
+          retention-days: 7
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, zig: true }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-latest, zig: true }
+          - { target: x86_64-apple-darwin, os: macos-latest, zig: false }
+          - { target: aarch64-apple-darwin, os: macos-latest, zig: false }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, zig: false }
+          - { target: aarch64-pc-windows-msvc, os: windows-latest, zig: false }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-branch
+      - name: Check out the release branch
+        run: |
+          git clone --quiet release.bundle source
+          cd source && git checkout --quiet "${{ needs.prepare.outputs.branch }}"
+      - name: Install the toolchain
+        working-directory: source
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.target }}
+      - if: matrix.zig
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.17.0
+      - if: matrix.zig
+        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: cargo-zigbuild
+      - name: Build
+        working-directory: source
+        run: |
+          if [ "${{ matrix.zig }}" = "true" ]; then
+            cargo zigbuild --release --locked -p wizard-cli --target ${{ matrix.target }}
+          else
+            cargo build --release --locked -p wizard-cli --target ${{ matrix.target }}
+          fi
+      - name: Name the binary
+        run: |
+          suffix=""
+          case "${{ matrix.target }}" in *windows*) suffix=".exe" ;; esac
+          mkdir dist
+          cp "source/target/${{ matrix.target }}/release/wizard$suffix" "dist/wizard-${{ matrix.target }}$suffix"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wizard-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Pin and publish
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: artifacts
+      - name: Collect binaries and checksums
+        run: |
+          mkdir dist
+          find artifacts -type f -name 'wizard-*' -exec cp {} dist/ \;
+          count=$(ls dist | wc -l)
+          [ "$count" -eq 6 ] || { echo "expected 6 binaries, found $count"; ls dist; exit 1; }
+          (cd dist && sha256sum wizard-* | sort -k 2 > SHA256SUMS)
+          cat dist/SHA256SUMS
+      - name: Check out the release branch
+        run: |
+          git clone --quiet artifacts/release-branch/release.bundle source
+          cd source && git checkout --quiet "${{ needs.prepare.outputs.branch }}"
+      - name: Pin the binaries and bump the plugin version
+        working-directory: source
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          version = os.environ["VERSION"]
+          sums = {}
+          for line in pathlib.Path("../dist/SHA256SUMS").read_text().splitlines():
+              digest, name = line.split()
+              target = name.removeprefix("wizard-").removesuffix(".exe")
+              sums[target] = digest
+          lock = {
+              "version": version,
+              "url": f"https://github.com/Anthony14FR/Context-Wizard/releases/download/v{version}",
+              "sha256": dict(sorted(sums.items())),
+          }
+          pathlib.Path("plugin/binaries.lock.json").write_text(json.dumps(lock, indent=2) + "\n")
+          manifest_path = pathlib.Path("plugin/.claude-plugin/plugin.json")
+          manifest = json.loads(manifest_path.read_text())
+          manifest["version"] = version
+          manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(release): pin binaries for v$VERSION"
+          git log --oneline -3
+      - name: Tag, push and publish
+        if: ${{ !inputs.dry_run }}
+        working-directory: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+          gh release create "v$VERSION" ../dist/* --verify-tag --title "v$VERSION" --notes "See CHANGELOG.md for the changes in this release."
+          git push origin "HEAD:${{ github.event.repository.default_branch }}"
+          git push origin --delete "${{ needs.prepare.outputs.branch }}"
