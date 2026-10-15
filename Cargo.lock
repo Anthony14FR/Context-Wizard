@@ -327,6 +327,7 @@ name = "wizard-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "serde",
  "serde_json",
  "tempfile",
  "wizard-core",
