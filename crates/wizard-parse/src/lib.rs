@@ -2,6 +2,7 @@
 
 pub mod extract;
 pub mod grammar;
+pub mod lexical;
 
 /// Returns the tree-sitter language of a file from its path, or from its first line when the
 /// path is not enough, such as a script with a shebang and no extension.
