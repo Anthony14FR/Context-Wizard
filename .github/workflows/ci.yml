@@ -96,3 +96,28 @@ jobs:
       - run: npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
       - run: claude plugin validate --strict .
       - run: claude plugin validate --strict ./plugin
+
+  install:
+    name: Install (${{ matrix.os }})
+    if: github.event_name == 'push' || !github.event.pull_request.draft
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    env:
+      CLAUDE_CODE_VERSION: 2.1.300
+      DISABLE_AUTOUPDATER: 1
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+      - run: claude plugin marketplace add "$GITHUB_WORKSPACE"
+      - run: claude plugin install context-wizard@context-wizard
+      - run: claude plugin list | tee plugins.txt && grep -A4 'context-wizard@context-wizard' plugins.txt | grep -q 'enabled'
