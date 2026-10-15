@@ -1,0 +1,65 @@
+[repository]
+name = "flask"
+url = "https://github.com/pallets/flask"
+sha = "d086db856be187255b8ec61ef409357393020f32"
+stack = "Python"
+
+[[task]]
+id = "flask-01"
+kind = "locate"
+prompt = "Where does Flask sign the session cookie and which module serializes the session data to JSON, including extra types like datetime? Give the file paths."
+answer_contains = ["src/flask/sessions.py", "src/flask/json/tag.py"]
+
+[[task]]
+id = "flask-02"
+kind = "locate"
+prompt = "How does render_template find a template that lives in a blueprint's template folder instead of the app's? Name the loader class and the file that defines it."
+answer_contains = ["DispatchingJinjaLoader", "src/flask/templating.py"]
+
+[[task]]
+id = "flask-03"
+kind = "locate"
+prompt = "Which function implements the `flask routes` command, and in which file? Answer concisely."
+answer_contains = ["routes_command", "src/flask/cli.py"]
+
+[[task]]
+id = "flask-04"
+kind = "locate"
+prompt = "Where is the MAX_CONTENT_LENGTH config default declared, and where is it actually read to limit the request body size? Give both file paths."
+answer_contains = ["src/flask/app.py", "src/flask/wrappers.py"]
+
+[[task]]
+id = "flask-05"
+kind = "locate"
+prompt = "Which Config method loads settings from environment variables with a prefix such as FLASK_, parsing values as JSON? Give the method name and its file."
+answer_contains = ["from_prefixed_env", "src/flask/config.py"]
+
+[[task]]
+id = "flask-06"
+kind = "locate"
+prompt = "Which Flask methods send the request_started signal and the got_request_exception signal? Name both methods and their file."
+answer_contains = ["full_dispatch_request", "handle_exception", "src/flask/app.py"]
+
+[[task]]
+id = "flask-07"
+kind = "locate"
+prompt = "Which method looks up the registered error handler for an exception, preferring blueprint handlers and specific status codes? Give the method name and file path."
+answer_contains = ["_find_error_handler", "src/flask/sansio/app.py"]
+
+[[task]]
+id = "flask-08"
+kind = "edit"
+prompt = "Add a new blinker signal named request_aborted (\"request-aborted\") next to the other signals, and export it from the top-level flask package like the other signals."
+check = "grep -q request_aborted src/flask/signals.py && grep -q request_aborted src/flask/__init__.py"
+
+[[task]]
+id = "flask-09"
+kind = "edit"
+prompt = "Add a new default config key MAX_JSON_BODY_SIZE set to None in the Flask app's default config, and document it in the configuration docs."
+check = "grep -q MAX_JSON_BODY_SIZE src/flask/app.py && grep -q MAX_JSON_BODY_SIZE docs/config.rst"
+
+[[task]]
+id = "flask-10"
+kind = "edit"
+prompt = "Change the session cookie signing salt to \"cookie-session-v2\" and add a note about it to the changelog."
+check = "grep -q 'salt = \"cookie-session-v2\"' src/flask/sessions.py && grep -q cookie-session-v2 CHANGES.rst"

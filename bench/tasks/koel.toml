@@ -1,0 +1,65 @@
+[repository]
+name = "koel"
+url = "https://github.com/koel/koel"
+sha = "7573a232ef4bb9f9733779ae6e308b82a0aba1ee"
+stack = "Laravel (PHP) with a Vue front end"
+
+[[task]]
+id = "koel-01"
+kind = "locate"
+prompt = "After a media scan finishes, records for files that no longer exist get removed. Which listener does that and where is it wired to the scan-completed event? Answer concisely with file paths."
+answer_contains = ["app/Listeners/DeleteNonExistingRecordsPostScan.php", "app/Providers/EventServiceProvider.php"]
+
+[[task]]
+id = "koel-02"
+kind = "locate"
+prompt = "Where are the signed song play URLs generated, and which middleware validates that signature on the audio request? Give the file paths."
+answer_contains = ["app/Services/Streamer/AudioUrlSigner.php", "app/Http/Middleware/AuthenticateAudioRequests.php"]
+
+[[task]]
+id = "koel-03"
+kind = "locate"
+prompt = "Which classes pick the transcoding strategy and the streaming adapter depending on a song's storage type? Name the file paths."
+answer_contains = ["app/Services/Transcoding/TranscodeStrategyFactory.php", "app/Services/Streamer/Streamer.php"]
+
+[[task]]
+id = "koel-04"
+kind = "locate"
+prompt = "When playback starts, what listener pushes the now-playing update to Last.fm and ListenBrainz, and which service fans it out to the connected scrobblers? Give class names."
+answer_contains = ["UpdateNowPlaying", "ScrobbleService"]
+
+[[task]]
+id = "koel-05"
+kind = "locate"
+prompt = "In the library scanner, where is the choice between parallel and sequential scanning made based on the number of jobs, and which class runs the parallel workers? Give file paths."
+answer_contains = ["app/Services/Scanners/DirectoryScanner.php", "app/Services/Scanners/Strategies/ParallelScanStrategy.php"]
+
+[[task]]
+id = "koel-06"
+kind = "locate"
+prompt = "On the front end, which service caches signed URLs and reuses them until they are close to expiry? And which API controller returns the signed play URL for a song?"
+answer_contains = ["resources/assets/js/services/signedUrlService.ts", "FetchSongPlayUrlController"]
+
+[[task]]
+id = "koel-07"
+kind = "locate"
+prompt = "Where is it enforced that a smart playlist rule with a between operator has exactly two values? Name the class and the operator method involved."
+answer_contains = ["SmartPlaylistRule", "takesTwoValues"]
+
+[[task]]
+id = "koel-08"
+kind = "edit"
+prompt = "In the audio URL signer, add a private constant MIN_URL_VALID_SECONDS with the value 60 next to the existing EXTRA_VALID_SECONDS constant."
+check = "grep -q 'MIN_URL_VALID_SECONDS' app/Services/Streamer/AudioUrlSigner.php"
+
+[[task]]
+id = "koel-09"
+kind = "edit"
+prompt = "Reduce the front-end signed URL reuse margin so cached URLs are only reused while more than 5 minutes remain, instead of 10 minutes."
+check = "grep -qF 'REUSE_MARGIN_SECONDS = 5 * 60' resources/assets/js/services/signedUrlService.ts"
+
+[[task]]
+id = "koel-10"
+kind = "edit"
+prompt = "In ScrobbleService::scrobble, add a guard that returns early without scrobbling when the timestamp is zero or negative."
+check = "grep -q 'timestamp <= 0' app/Services/ScrobbleService.php"

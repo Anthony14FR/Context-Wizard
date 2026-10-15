@@ -1,0 +1,65 @@
+[repository]
+name = "fzf"
+url = "https://github.com/junegunn/fzf"
+sha = "c8c2d0828a94a00879ceb6f95112a42e3ea322cf"
+stack = "Go"
+
+[[task]]
+id = "fzf-01"
+kind = "locate"
+prompt = "Where is the fuzzy match scoring implemented, including the bonus constants for word boundaries and consecutive matches? Answer concisely with the file path and the main V2 matching function."
+answer_contains = ["src/algo/algo.go", "FuzzyMatchV2"]
+
+[[task]]
+id = "fzf-02"
+kind = "locate"
+prompt = "Which file implements the HTTP server behind --listen, including the check that requires FZF_API_KEY for non-local addresses? Answer concisely with the file path and the function that starts the server."
+answer_contains = ["src/server.go", "startHttpServer"]
+
+[[task]]
+id = "fzf-03"
+kind = "locate"
+prompt = "Where is the query history file loaded and trimmed to its maximum size, and which function in options.go constructs it when --history is parsed? Give the file paths and symbol names, briefly."
+answer_contains = ["src/history.go", "NewHistory"]
+
+[[task]]
+id = "fzf-04"
+kind = "locate"
+prompt = "Which file holds the per-chunk cache that remembers match results for a query so typing another character can reuse them, and what is the cache type called? Answer briefly with path and type name."
+answer_contains = ["src/cache.go", "ChunkCache"]
+
+[[task]]
+id = "fzf-05"
+kind = "locate"
+prompt = "Where does fzf parse field index expressions such as 2..4 used by --nth and --with-nth? Answer briefly with the file path and the function name."
+answer_contains = ["src/tokenizer.go", "ParseRange"]
+
+[[task]]
+id = "fzf-06"
+kind = "locate"
+prompt = "Where is the tiebreak ordering (length, pathname criteria) applied when comparing matched results? Name the file path and the sort type that implements it, concisely."
+answer_contains = ["src/result.go", "ByRelevance"]
+
+[[task]]
+id = "fzf-07"
+kind = "locate"
+prompt = "Which shell script defines the bash CTRL-R history search widget, and what is the name of the function it binds? Answer concisely with the path and function name."
+answer_contains = ["shell/key-bindings.bash", "__fzf_history__"]
+
+[[task]]
+id = "fzf-08"
+kind = "edit"
+prompt = "Raise the default maximum history size from 1000 to 2000: update defaultHistoryMax in the constants and the --history-size help text in src/options.go so the documented default matches."
+check = "grep -q 'defaultHistoryMax int = 2000' src/constants.go && grep -q '(default: 2000)' src/options.go"
+
+[[task]]
+id = "fzf-09"
+kind = "edit"
+prompt = "Rename the NewHistory constructor to NewHistoryFile and update every caller, including the call in parseOptions and the tests."
+check = "grep -q 'func NewHistoryFile(' src/history.go && grep -q 'NewHistoryFile(path, historyMax)' src/options.go && grep -q 'NewHistoryFile(' src/history_test.go"
+
+[[task]]
+id = "fzf-10"
+kind = "edit"
+prompt = "Add a new file src/algo/doc.go containing only a package comment starting with '// Package algo' that briefly describes the fuzzy matching algorithms, followed by the package clause."
+check = "test -f src/algo/doc.go && grep -q '^// Package algo' src/algo/doc.go && grep -q '^package algo' src/algo/doc.go"

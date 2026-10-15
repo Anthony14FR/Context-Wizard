@@ -1,0 +1,65 @@
+[repository]
+name = "spring-petclinic"
+url = "https://github.com/spring-projects/spring-petclinic"
+sha = "500158f732419217507c7656904b8e6aa1bcc0d6"
+stack = "Java with Spring Boot and Maven"
+
+[[task]]
+id = "spring-petclinic-01"
+kind = "locate"
+prompt = "Which controller handles the owner search page, and which repository method does it call to find owners by last name? Answer concisely with the file path and method name."
+answer_contains = ["owner/OwnerController.java", "findByLastNameStartingWith"]
+
+[[task]]
+id = "spring-petclinic-02"
+kind = "locate"
+prompt = "The vets list is cached. Which file defines the cache named vets, and which file puts the caching annotation on the lookup methods? Answer concisely with file paths."
+answer_contains = ["system/CacheConfiguration.java", "vet/VetRepository.java"]
+
+[[task]]
+id = "spring-petclinic-03"
+kind = "locate"
+prompt = "Where is the 10-digit telephone number rule for owners declared, and in which resource file is its error message text defined? Answer concisely with file paths."
+answer_contains = ["owner/Owner.java", "messages/messages.properties"]
+
+[[task]]
+id = "spring-petclinic-04"
+kind = "locate"
+prompt = "Which class validates the pet name length and required birth date, and which controller registers it on the form binder? Answer concisely with the class name and file paths."
+answer_contains = ["owner/PetValidator.java", "owner/PetController.java"]
+
+[[task]]
+id = "spring-petclinic-05"
+kind = "locate"
+prompt = "How does the UI language get switched at runtime through a request parameter? Name the file and the interceptor class involved. Answer concisely."
+answer_contains = ["system/WebConfiguration.java", "LocaleChangeInterceptor"]
+
+[[task]]
+id = "spring-petclinic-06"
+kind = "locate"
+prompt = "Which class converts the pet type text submitted in the pet form into a PetType, and which repository does it query to do so? Answer concisely with the file paths."
+answer_contains = ["owner/PetTypeFormatter.java", "owner/PetTypeRepository.java"]
+
+[[task]]
+id = "spring-petclinic-07"
+kind = "locate"
+prompt = "Which test checks that all translated messages properties files stay in sync, and which main class registers the messages resources for native image hints? Answer concisely with file paths."
+answer_contains = ["system/I18nPropertiesSyncTest.java", "PetClinicRuntimeHints.java"]
+
+[[task]]
+id = "spring-petclinic-08"
+kind = "edit"
+prompt = "The owners search results are paginated 5 per page. Change the page size used by the owners list controller to 10."
+check = "grep -q 'int pageSize = 10' src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java"
+
+[[task]]
+id = "spring-petclinic-09"
+kind = "edit"
+prompt = "Raise the maximum pet name length from 30 to 50 in the pet validator, and update the validation error message text so it says 50 characters instead of 30."
+check = "grep -q 'MAX_NAME_LENGTH = 50' src/main/java/org/springframework/samples/petclinic/owner/PetValidator.java && grep -q 'no more than 50 characters' src/main/java/org/springframework/samples/petclinic/owner/PetValidator.java"
+
+[[task]]
+id = "spring-petclinic-10"
+kind = "edit"
+prompt = "Rename the request parameter used to switch the UI language from lang to locale in the web MVC configuration."
+check = "grep -q 'setParamName(\"locale\")' src/main/java/org/springframework/samples/petclinic/system/WebConfiguration.java"

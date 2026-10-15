@@ -1,0 +1,65 @@
+[repository]
+name = "pester"
+url = "https://github.com/pester/Pester"
+sha = "98e56d65da1642a7158992b50ded240c42a3ac18"
+stack = "PowerShell"
+
+[[task]]
+id = "pester-01"
+kind = "locate"
+prompt = "When Run.Parallel is on, how does Pester decide a test file must run sequentially because of its '#pester:no-parallel' comment? Name the function and its file path."
+answer_contains = ["Test-PesterFileIsNonParallel", "src/functions/Pester.Parallel.ps1"]
+
+[[task]]
+id = "pester-02"
+kind = "locate"
+prompt = "With Run.Shuffle enabled, which functions pick the shuffled order and detect a '#pester:no-shuffle' opt-out for a container? Give the function names and the file they live in."
+answer_contains = ["Get-ShuffledOrder", "Test-BlockContainerIsNoShuffle", "src/Pester.Runtime.ps1"]
+
+[[task]]
+id = "pester-03"
+kind = "locate"
+prompt = "Where are the attributes of each JUnit <testcase> element written, and which file defines the public Export-JUnitReport command? Give function name and file paths."
+answer_contains = ["Write-JUnitTestCaseAttributes", "src/functions/TestResults.JUnit4.ps1", "src/functions/TestResults.ps1"]
+
+[[task]]
+id = "pester-04"
+kind = "locate"
+prompt = "Which function builds the Cobertura coverage XML, and which file picks the report format and calls it? Name the function and the file paths."
+answer_contains = ["Get-CoberturaReportXml", "src/functions/Coverage.Plugin.ps1", "src/functions/Coverage.ps1"]
+
+[[task]]
+id = "pester-05"
+kind = "locate"
+prompt = "Add-ShouldOperator rejects an operator whose name or alias is already registered. Which function does that uniqueness check, and in which file is Add-ShouldOperator defined?"
+answer_contains = ["Assert-AssertionOperatorNameIsUnique", "src/Main.ps1"]
+
+[[task]]
+id = "pester-06"
+kind = "locate"
+prompt = "Which function evaluates a Mock's -ParameterFilter against the bound parameters of a call, and in which file does the Invoke-Mock entry point live?"
+answer_contains = ["Test-ParameterFilter", "src/functions/Mock.ps1", "src/functions/Pester.SessionState.Mock.ps1"]
+
+[[task]]
+id = "pester-07"
+kind = "locate"
+prompt = "TestDrive cleanup removes symbolic links before deleting files. Which function does that, in which file, and which C# file defines the TestDrive.Enabled configuration option?"
+answer_contains = ["Remove-TestDriveSymbolicLinks", "src/functions/TestDrive.ps1", "src/csharp/Pester/TestDriveConfiguration.cs"]
+
+[[task]]
+id = "pester-08"
+kind = "edit"
+prompt = "In the C# TestDriveConfiguration class, change the description of the Enabled option from 'Enable TestDrive.' to 'Enable TestDrive for the test run.' and leave the default value as is."
+check = "grep -q \"Enable TestDrive for the test run\" src/csharp/Pester/TestDriveConfiguration.cs"
+
+[[task]]
+id = "pester-09"
+kind = "edit"
+prompt = "Rename the function Test-PesterFileIsNonParallel to Test-PesterFileOptsOutOfParallel, updating its definition, the caller in the Invoke-Pester source and every reference under src and tst."
+check = "grep -q \"function Test-PesterFileOptsOutOfParallel\" src/functions/Pester.Parallel.ps1 && grep -q \"Test-PesterFileOptsOutOfParallel -Path\" src/Main.ps1 && ! grep -rq \"Test-PesterFileIsNonParallel\" src tst"
+
+[[task]]
+id = "pester-10"
+kind = "edit"
+prompt = "Rename Remove-TestDriveSymbolicLinks to Remove-TestDriveSymlinks, updating the definition and all call sites under src and tst."
+check = "grep -q \"function Remove-TestDriveSymlinks\" src/functions/TestDrive.ps1 && ! grep -rq \"Remove-TestDriveSymbolicLinks\" src tst"
