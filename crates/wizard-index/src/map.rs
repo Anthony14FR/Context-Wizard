@@ -3,7 +3,9 @@
 //!
 //! A definition scores one point per distinct other file that references its name, divided by
 //! the number of files that define that name, so generic names such as `new` or `fmt` do not
-//! dominate. A file scores the sum of its definitions. Files are listed by decreasing score, each with its most
+//! dominate. A file scores the sum of its definitions. Test files rank after production code:
+//! their definitions, often mocks of real names, do not count as definers, and their score is
+//! divided by ten. Files are listed by decreasing score, each with its most
 //! used definitions in line order, until the budget is spent. Rendering stops at the first
 //! line that does not fit, so a lower-ranked file is never shown in place of a higher one.
 
@@ -17,6 +19,7 @@ pub const L1_BUDGET: u64 = 4_000;
 
 const MAX_DEFINITIONS_PER_FILE: usize = 30;
 const POINT: usize = 1_000;
+const TEST_PENALTY: usize = 10;
 const HEADER: &str = "# Repository map (Context Wizard)\nDefinitions ranked by how many other files use them, with line numbers.\n";
 
 struct RankedFile<'a> {
@@ -47,7 +50,7 @@ fn rank(symbols: &[LocatedSymbol]) -> Vec<RankedFile<'_>> {
     }
     let mut defining: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     for located in symbols {
-        if located.symbol.kind == SymbolKind::Definition {
+        if located.symbol.kind == SymbolKind::Definition && !is_test_path(&located.path) {
             defining
                 .entry(located.symbol.name.as_str())
                 .or_default()
@@ -72,7 +75,12 @@ fn rank(symbols: &[LocatedSymbol]) -> Vec<RankedFile<'_>> {
     let mut ranked: Vec<RankedFile<'_>> = files
         .into_iter()
         .map(|(path, mut definitions)| {
-            let score = definitions.iter().map(|(_, score)| score).sum();
+            let total: usize = definitions.iter().map(|(_, score)| score).sum();
+            let score = if is_test_path(path) {
+                total / TEST_PENALTY
+            } else {
+                total
+            };
             definitions
                 .sort_by(|left, right| right.1.cmp(&left.1).then(left.0.line.cmp(&right.0.line)));
             definitions.truncate(MAX_DEFINITIONS_PER_FILE);
@@ -116,6 +124,25 @@ fn render(files: &[RankedFile<'_>], budget: u64) -> String {
         text.push_str(&block);
     }
     text
+}
+
+fn is_test_path(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    let name = lower.rsplit('/').next().unwrap_or(&lower);
+    let in_test_folder = lower.split('/').rev().skip(1).any(|segment| {
+        matches!(
+            segment,
+            "test" | "tests" | "__tests__" | "__mocks__" | "spec" | "specs" | "e2e" | "fixtures"
+        )
+    });
+    in_test_folder
+        || name.contains(".test.")
+        || name.contains(".spec.")
+        || name.ends_with("_test.go")
+        || name.ends_with("_test.py")
+        || name.starts_with("test_")
+        || name.ends_with("test.java")
+        || name.ends_with("tests.ps1")
 }
 
 fn describe(symbol: &SymbolRecord) -> String {
@@ -180,6 +207,33 @@ mod tests {
             "{text}"
         );
         assert!(text.find("src/core.rs") < text.find("src/a.rs"));
+    }
+
+    #[test]
+    fn ranks_test_files_after_production_code() {
+        let symbols = vec![
+            symbol("src/theme.ts", SymbolKind::Definition, "useTheme", 1),
+            symbol("src/Button.test.tsx", SymbolKind::Definition, "useTheme", 3),
+            symbol(
+                "src/Button.test.tsx",
+                SymbolKind::Definition,
+                "useLingui",
+                4,
+            ),
+            symbol("src/i18n.ts", SymbolKind::Definition, "useLingui", 1),
+            symbol("src/a.tsx", SymbolKind::Reference, "useTheme", 1),
+            symbol("src/b.tsx", SymbolKind::Reference, "useTheme", 1),
+            symbol("src/a.tsx", SymbolKind::Reference, "useLingui", 2),
+        ];
+        let ranked = rank(&symbols);
+        let order: Vec<&str> = ranked.iter().map(|file| file.path).collect();
+        assert_eq!(
+            order,
+            ["src/theme.ts", "src/i18n.ts", "src/Button.test.tsx"]
+        );
+        assert!(super::is_test_path("pkg/server_test.go"));
+        assert!(super::is_test_path("tests/test_app.py"));
+        assert!(!super::is_test_path("src/testing/harness.ts"));
     }
 
     #[test]

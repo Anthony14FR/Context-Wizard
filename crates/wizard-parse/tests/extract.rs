@@ -57,3 +57,33 @@ fn output_is_deterministic() {
 fn unknown_languages_are_unavailable() {
     assert!(extract("not-a-language", "x").is_err());
 }
+
+#[test]
+fn typescript_files_get_their_functions_and_classes() {
+    let source = "export function loadFeed(id: string): Feed {\n  return fetchFeed(id);\n}\n\nexport class FeedTuner {\n  tune(feed: Feed) {}\n}\n\ninterface Feed { id: string }\n";
+    for language in ["typescript", "tsx"] {
+        let tags = extract(language, source).unwrap();
+        let defined = definitions(&tags);
+        assert!(
+            defined
+                .iter()
+                .any(|(line, _, name)| *line == 1 && *name == "loadFeed"),
+            "{language}: {defined:?}"
+        );
+        assert!(
+            defined
+                .iter()
+                .any(|(line, _, name)| *line == 5 && *name == "FeedTuner"),
+            "{language}: {defined:?}"
+        );
+        assert!(
+            defined.iter().any(|(_, _, name)| *name == "Feed"),
+            "{language}: {defined:?}"
+        );
+        assert!(
+            tags.iter()
+                .any(|tag| tag.kind == TagKind::Reference && tag.name == "fetchFeed"),
+            "{language}"
+        );
+    }
+}
