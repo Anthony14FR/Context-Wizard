@@ -1,14 +1,18 @@
 //! Extraction of definitions and references with the tags query of each language.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use streaming_iterator::StreamingIterator;
-use tree_sitter::{Node, Parser, QueryCursor};
-use tree_sitter_language_pack::{QueryKind, get_query};
+use tree_sitter::{Language, Node, Parser, Query, QueryCursor};
+use tree_sitter_language_pack::{QueryKind, get_query, get_tags_query};
 
 use crate::grammar::{self, GrammarError};
 
 const MAX_SIGNATURE_CHARS: usize = 160;
+
+static EXTENDED_QUERIES: LazyLock<Mutex<HashMap<String, Option<Arc<Query>>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Whether a tag defines a name or refers to it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -47,12 +51,9 @@ pub struct Tag {
 /// source cannot be parsed.
 pub fn extract(language: &str, source: &str) -> Result<Vec<Tag>, GrammarError> {
     let grammar = grammar::language(language)?;
-    let query = get_query(language, QueryKind::Tags)
-        .ok()
-        .flatten()
-        .ok_or_else(|| GrammarError::NoTagsQuery {
-            language: language.to_owned(),
-        })?;
+    let query = tags_query(language, &grammar).ok_or_else(|| GrammarError::NoTagsQuery {
+        language: language.to_owned(),
+    })?;
     let parse_error = || GrammarError::Parse {
         language: language.to_owned(),
     };
@@ -93,6 +94,36 @@ pub fn extract(language: &str, source: &str) -> Result<Vec<Tag>, GrammarError> {
         same
     });
     Ok(tags)
+}
+
+/// Returns the tags query of `language`.
+///
+/// The TypeScript tags queries only cover TypeScript-specific constructs and are meant to extend
+/// the JavaScript one, so both are combined for `typescript` and `tsx`, falling back to the
+/// TypeScript query alone when the combination does not compile for the grammar.
+fn tags_query(language: &str, grammar: &Language) -> Option<Arc<Query>> {
+    if !matches!(language, "typescript" | "tsx") {
+        return get_query(language, QueryKind::Tags).ok().flatten();
+    }
+    if let Ok(cache) = EXTENDED_QUERIES.lock()
+        && let Some(query) = cache.get(language)
+    {
+        return query.clone();
+    }
+    let own = get_tags_query(language).unwrap_or_default();
+    let combined = format!(
+        "{}
+{own}",
+        get_tags_query("javascript").unwrap_or_default()
+    );
+    let query = Query::new(grammar, &combined)
+        .or_else(|_| Query::new(grammar, own))
+        .ok()
+        .map(Arc::new);
+    if let Ok(mut cache) = EXTENDED_QUERIES.lock() {
+        cache.insert(language.to_owned(), query.clone());
+    }
+    query
 }
 
 fn classify(capture_name: &str) -> Option<(TagKind, &str)> {
