@@ -1,27 +1,47 @@
-//! Tests of the plugin's polyglot `SessionStart` launcher in every shell Claude Code may use.
+//! Tests of the plugin's polyglot `SessionStart` launcher in every shell Claude Code may use:
+//! hand-off to the installed binary, first-run download, checksum check and proxy support.
 
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::panic)]
 
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
 
 const PROMPT: &str = r#"{"hook_event_name":"UserPromptSubmit","prompt":"café ✓"}"#;
+const TARGETS: [&str; 6] = [
+    "aarch64-apple-darwin",
+    "aarch64-pc-windows-msvc",
+    "aarch64-unknown-linux-musl",
+    "x86_64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-musl",
+];
 
-fn plugin_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../plugin")
+fn binary_name() -> &'static str {
+    if cfg!(windows) {
+        "wizard.exe"
+    } else {
+        "wizard"
+    }
 }
 
-fn launcher_command() -> String {
-    let hooks = std::fs::read_to_string(plugin_root().join("hooks/hooks.json")).unwrap();
+fn forward_slashes(path: &Path) -> String {
+    let path = path.canonicalize().unwrap();
+    let text = path.to_string_lossy().replace('\\', "/");
+    text.strip_prefix("//?/").unwrap_or(&text).to_owned()
+}
+
+fn launcher_command(root: &Path) -> String {
+    let hooks = std::fs::read_to_string(root.join("hooks/hooks.json")).unwrap();
     let hooks: serde_json::Value = serde_json::from_str(&hooks).unwrap();
     let command = hooks["hooks"]["SessionStart"][0]["hooks"][0]["command"]
         .as_str()
         .unwrap();
-    let root = plugin_root().canonicalize().unwrap();
-    let root = root.to_string_lossy().replace('\\', "/");
-    let root = root.strip_prefix("//?/").unwrap_or(&root).to_owned();
-    command.replace("${CLAUDE_PLUGIN_ROOT}", &root)
+    command.replace("${CLAUDE_PLUGIN_ROOT}", &forward_slashes(root))
 }
 
 fn git_bash() -> Option<PathBuf> {
@@ -46,6 +66,16 @@ fn shells() -> Vec<Vec<String>> {
             "Bypass",
             "-Command",
         ])];
+        if Command::new("pwsh.exe").arg("-Version").output().is_ok() {
+            shells.push(owned(&[
+                "pwsh.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+            ]));
+        }
         if let Some(bash) = git_bash() {
             shells.push(vec![bash.to_string_lossy().into_owned(), "-c".to_owned()]);
         }
@@ -55,62 +85,255 @@ fn shells() -> Vec<Vec<String>> {
     }
 }
 
-fn run(shell: &[String], data: &Path, project: &Path, input: &str) -> Output {
-    let mut child = Command::new(&shell[0])
-        .args(&shell[1..])
-        .arg(launcher_command())
-        .env("CLAUDE_PLUGIN_DATA", data)
-        .env("CLAUDE_PROJECT_DIR", project)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(input.as_bytes())
-        .unwrap();
-    child.wait_with_output().unwrap()
+struct Launch<'a> {
+    root: &'a Path,
+    data: &'a Path,
+    project: &'a Path,
+    env: Vec<(&'a str, String)>,
 }
 
-fn install_binary(data: &Path) {
-    let name = if cfg!(windows) {
-        "wizard.exe"
-    } else {
-        "wizard"
-    };
-    let bin = data.join("bin");
-    std::fs::create_dir_all(&bin).unwrap();
-    std::fs::copy(env!("CARGO_BIN_EXE_wizard"), bin.join(name)).unwrap();
+impl Launch<'_> {
+    fn run(&self, shell: &[String]) -> Output {
+        let mut command = Command::new(&shell[0]);
+        command
+            .args(&shell[1..])
+            .arg(launcher_command(self.root))
+            .env("CLAUDE_PLUGIN_DATA", self.data)
+            .env("CLAUDE_PROJECT_DIR", self.project)
+            .env_remove("HTTPS_PROXY")
+            .env_remove("HTTP_PROXY")
+            .env_remove("https_proxy")
+            .env_remove("http_proxy")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        for (key, value) in &self.env {
+            command.env(key, value);
+        }
+        let mut child = command.spawn().unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(PROMPT.as_bytes())
+            .unwrap();
+        child.wait_with_output().unwrap()
+    }
+}
+
+fn sha256(path: &Path) -> String {
+    use sha2::Digest;
+    let digest = sha2::Sha256::digest(std::fs::read(path).unwrap());
+    digest.iter().fold(String::new(), |mut hex, byte| {
+        let _ = std::fmt::Write::write_fmt(&mut hex, format_args!("{byte:02x}"));
+        hex
+    })
+}
+
+fn plugin_copy(url: &str, sha: &str) -> tempfile::TempDir {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../plugin");
+    let root = tempfile::tempdir().unwrap();
+    for directory in ["hooks", "scripts"] {
+        std::fs::create_dir_all(root.path().join(directory)).unwrap();
+        for entry in std::fs::read_dir(source.join(directory)).unwrap() {
+            let entry = entry.unwrap();
+            std::fs::copy(
+                entry.path(),
+                root.path().join(directory).join(entry.file_name()),
+            )
+            .unwrap();
+        }
+    }
+    let lock = serde_json::json!({
+        "version": env!("CARGO_PKG_VERSION"),
+        "url": url,
+        "sha256": TARGETS.iter().map(|target| (target.to_string(), sha.into())).collect::<serde_json::Map<_, _>>(),
+    });
+    std::fs::write(
+        root.path().join("binaries.lock.json"),
+        serde_json::to_string_pretty(&lock).unwrap(),
+    )
+    .unwrap();
+    root
+}
+
+struct Server {
+    address: String,
+    hits: Arc<AtomicUsize>,
+}
+
+fn serve_binary() -> Server {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let body = std::fs::read(env!("CARGO_BIN_EXE_wizard")).unwrap();
+    let hits = Arc::new(AtomicUsize::new(0));
+    let counter = Arc::clone(&hits);
+    thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { continue };
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut request_line = String::new();
+            let _ = reader.read_line(&mut request_line);
+            let mut header = String::new();
+            while reader.read_line(&mut header).is_ok_and(|read| read > 2) {
+                header.clear();
+            }
+            let path = request_line.split_whitespace().nth(1).unwrap_or_default();
+            let known = TARGETS.iter().any(|target| {
+                path.ends_with(&format!("/wizard-{target}"))
+                    || path.ends_with(&format!("/wizard-{target}.exe"))
+            });
+            if known {
+                counter.fetch_add(1, Ordering::SeqCst);
+                let _ = write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                let _ = stream.write_all(&body);
+            } else {
+                let _ = stream.write_all(
+                    b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                );
+            }
+        }
+    });
+    Server { address, hits }
+}
+
+fn assert_question(shell: &[String], output: &Output) {
+    assert!(output.status.success(), "{shell:?}: {output:?}");
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .unwrap_or_else(|error| panic!("{shell:?}: {error}: {output:?}"));
+    let context = value["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .unwrap();
+    assert!(context.contains("decide on --project"), "{shell:?}");
+}
+
+fn assert_silent(shell: &[String], output: &Output) {
+    assert!(output.status.success(), "{shell:?}: {output:?}");
+    assert!(output.stdout.is_empty(), "{shell:?}: {output:?}");
+    assert!(output.stderr.is_empty(), "{shell:?}: {output:?}");
 }
 
 #[test]
-fn launcher_is_silent_without_binary() {
-    let data = tempfile::tempdir().unwrap();
-    let project = tempfile::tempdir().unwrap();
+fn launcher_is_silent_without_binary_or_checksum() {
+    let root = plugin_copy("http://127.0.0.1:9", "");
     for shell in shells() {
-        let output = run(&shell, data.path(), project.path(), PROMPT);
-        assert!(output.status.success(), "{shell:?}: {output:?}");
-        assert!(output.stdout.is_empty(), "{shell:?}: {output:?}");
-        assert!(output.stderr.is_empty(), "{shell:?}: {output:?}");
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let launch = Launch {
+            root: root.path(),
+            data: data.path(),
+            project: project.path(),
+            env: Vec::new(),
+        };
+        assert_silent(&shell, &launch.run(&shell));
     }
 }
 
 #[test]
-fn launcher_hands_the_event_to_the_installed_binary() {
-    let data = tempfile::tempdir().unwrap();
-    let project = tempfile::tempdir().unwrap();
-    install_binary(data.path());
+fn launcher_downloads_verifies_and_runs_the_binary() {
+    let server = serve_binary();
+    let sha = sha256(Path::new(env!("CARGO_BIN_EXE_wizard")));
+    let root = plugin_copy(&format!("http://{}/v1", server.address), &sha);
     for shell in shells() {
-        let output = run(&shell, data.path(), project.path(), PROMPT);
-        assert!(output.status.success(), "{shell:?}: {output:?}");
-        let value: serde_json::Value = serde_json::from_slice(&output.stdout)
-            .unwrap_or_else(|error| panic!("{shell:?}: {error}: {output:?}"));
-        let context = value["hookSpecificOutput"]["additionalContext"]
-            .as_str()
-            .unwrap();
-        assert!(context.contains("decide on --project"), "{shell:?}");
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let launch = Launch {
+            root: root.path(),
+            data: data.path(),
+            project: project.path(),
+            env: Vec::new(),
+        };
+        let hits = server.hits.load(Ordering::SeqCst);
+        let output = launch.run(&shell);
+        let error =
+            std::fs::read_to_string(data.path().join("bin/install-error")).unwrap_or_default();
+        assert!(error.is_empty(), "{shell:?}: {error}");
+        assert_question(&shell, &output);
+        assert_eq!(server.hits.load(Ordering::SeqCst), hits + 1, "{shell:?}");
+        let bin = data.path().join("bin");
+        assert!(bin.join(binary_name()).is_file(), "{shell:?}");
+        assert!(
+            bin.join(env!("CARGO_PKG_VERSION"))
+                .join(binary_name())
+                .is_file()
+        );
+        let current = std::fs::read_to_string(bin.join("current")).unwrap();
+        assert_eq!(current.trim(), env!("CARGO_PKG_VERSION"), "{shell:?}");
+        assert_question(&shell, &launch.run(&shell));
+        assert_eq!(server.hits.load(Ordering::SeqCst), hits + 1, "{shell:?}");
+    }
+}
+
+#[test]
+fn launcher_rejects_a_checksum_mismatch() {
+    let server = serve_binary();
+    let root = plugin_copy(&format!("http://{}/v1", server.address), &"0".repeat(64));
+    for shell in shells() {
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let launch = Launch {
+            root: root.path(),
+            data: data.path(),
+            project: project.path(),
+            env: Vec::new(),
+        };
+        assert_silent(&shell, &launch.run(&shell));
+        assert!(
+            !data.path().join("bin").join(binary_name()).exists(),
+            "{shell:?}"
+        );
+    }
+}
+
+#[test]
+fn launcher_downloads_through_the_configured_proxy() {
+    let proxy = serve_binary();
+    let sha = sha256(Path::new(env!("CARGO_BIN_EXE_wizard")));
+    let root = plugin_copy("http://releases.invalid/v1", &sha);
+    for shell in shells() {
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let launch = Launch {
+            root: root.path(),
+            data: data.path(),
+            project: project.path(),
+            env: vec![
+                ("HTTP_PROXY", format!("http://{}", proxy.address)),
+                ("http_proxy", format!("http://{}", proxy.address)),
+            ],
+        };
+        let output = launch.run(&shell);
+        let error =
+            std::fs::read_to_string(data.path().join("bin/install-error")).unwrap_or_default();
+        assert!(error.is_empty(), "{shell:?}: {error}");
+        assert_question(&shell, &output);
+    }
+}
+
+#[test]
+fn launcher_keeps_non_ascii_output_intact() {
+    let data = tempfile::tempdir().unwrap();
+    let parent = tempfile::tempdir().unwrap();
+    let project = parent.path().join("projet-été");
+    std::fs::create_dir_all(&project).unwrap();
+    let bin = data.path().join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    std::fs::copy(env!("CARGO_BIN_EXE_wizard"), bin.join(binary_name())).unwrap();
+    let root = plugin_copy("http://127.0.0.1:9", "");
+    for shell in shells() {
+        let launch = Launch {
+            root: root.path(),
+            data: data.path(),
+            project: &project,
+            env: Vec::new(),
+        };
+        let output = launch.run(&shell);
+        assert_question(&shell, &output);
+        let text = String::from_utf8(output.stdout).unwrap();
+        assert!(text.contains("projet-été"), "{shell:?}: {text}");
     }
 }
