@@ -1,0 +1,15 @@
+[package]
+name = "wizard-graph"
+description = "Compressed sparse row graph and personalised PageRank for Context Wizard, with no dependency."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true
