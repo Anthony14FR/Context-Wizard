@@ -1,18 +1,23 @@
-//! The `map` command, which prints the L0 overview of an indexed project.
+//! The `map` command, which prints the L0 overview or the L1 map of an indexed project.
 
 use std::path::Path;
 use std::process::ExitCode;
 
+use wizard_index::map::{L1_BUDGET, map};
 use wizard_index::overview::overview;
 use wizard_store::Index;
 
-/// Prints the overview of `project` from its current index.
+/// Prints the overview (level 0) or the map (level 1) of `project` from its current index.
 #[allow(
     clippy::print_stderr,
     reason = "the map command reports failures to the user"
 )]
-pub(crate) fn run(project: &Path) -> ExitCode {
-    match Index::open_project(project).and_then(|index| overview(project, &index)) {
+pub(crate) fn run(project: &Path, level: u8) -> ExitCode {
+    let rendered = Index::open_project(project).and_then(|index| match level {
+        0 => overview(project, &index),
+        _ => map(&index, L1_BUDGET),
+    });
+    match rendered {
         Ok(text) => {
             print!("{text}");
             ExitCode::SUCCESS

@@ -38,6 +38,9 @@ pub struct Tag {
 
 /// Parses `source` as `language` and returns its definitions and references, sorted by line.
 ///
+/// A name tagged twice on the same line with different roles, such as a method that is also
+/// matched as a function, is kept once.
+///
 /// # Errors
 ///
 /// Returns an error when the grammar is unavailable, the language has no tags query, or the
@@ -80,7 +83,16 @@ pub fn extract(language: &str, source: &str) -> Result<Vec<Tag>, GrammarError> {
             tags.insert(tag(kind, role, text, node, source));
         }
     }
-    Ok(tags.into_iter().collect())
+    let mut tags: Vec<Tag> = tags.into_iter().collect();
+    tags.dedup_by(|later, earlier| {
+        let same =
+            later.line == earlier.line && later.kind == earlier.kind && later.name == earlier.name;
+        if same && earlier.role == "function" && later.role != "function" {
+            std::mem::swap(later, earlier);
+        }
+        same
+    });
+    Ok(tags)
 }
 
 fn classify(capture_name: &str) -> Option<(TagKind, &str)> {

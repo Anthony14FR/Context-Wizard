@@ -41,8 +41,11 @@ enum Command {
         #[arg(long, default_value = ".")]
         project: PathBuf,
     },
-    /// Prints the overview of an indexed project.
+    /// Prints the overview or the map of an indexed project.
     Map {
+        /// 0 for the overview, 1 for the map of definitions.
+        #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u8).range(0..=1))]
+        level: u8,
         /// Project root. Defaults to the current directory.
         #[arg(long, default_value = ".")]
         project: PathBuf,
@@ -71,7 +74,7 @@ fn main() -> ExitCode {
             decide::run(&project, matches!(answer, Answer::On))
         }
         Some(Command::Index { project }) => index::run(&project),
-        Some(Command::Map { project }) => map::run(&project),
+        Some(Command::Map { level, project }) => map::run(&project, level),
         Some(Command::Status { project }) => status::run(&project),
         None => ExitCode::SUCCESS,
     }
