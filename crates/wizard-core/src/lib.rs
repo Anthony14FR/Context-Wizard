@@ -3,6 +3,7 @@
 pub mod atomic;
 pub mod date;
 pub mod decision;
+pub mod settings;
 
 /// Version of the Context Wizard binary, identical to the plugin version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

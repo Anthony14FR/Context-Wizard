@@ -97,3 +97,61 @@ fn unreadable_decision_stays_silent() {
     assert!(output.status.success());
     assert_eq!(String::from_utf8_lossy(&output.stdout), "");
 }
+
+fn installed_binary(data_dir_name: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+    let root = tempfile::tempdir().unwrap();
+    let bin = root.path().join(data_dir_name).join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    let name = if cfg!(windows) {
+        "wizard.exe"
+    } else {
+        "wizard"
+    };
+    std::fs::copy(env!("CARGO_BIN_EXE_wizard"), bin.join(name)).unwrap();
+    (root, bin.join(name))
+}
+
+fn decide_with(binary: &Path, project: &Path, answer: &str) -> Output {
+    Command::new(binary)
+        .args(["decide", answer, "--project"])
+        .arg(project)
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn disabling_from_a_plugin_install_adds_the_settings_override() {
+    for (data_dir, id) in [
+        (
+            "context-wizard-context-wizard",
+            "context-wizard@context-wizard",
+        ),
+        (
+            "context-wizard-context-wizard-beta",
+            "context-wizard@context-wizard-beta",
+        ),
+    ] {
+        let (_root, binary) = installed_binary(data_dir);
+        let project = tempfile::tempdir().unwrap();
+        let settings = project.path().join(".claude/settings.local.json");
+        assert!(decide_with(&binary, project.path(), "off").status.success());
+        let value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
+        assert_eq!(value["enabledPlugins"][id], false);
+        assert!(decide_with(&binary, project.path(), "on").status.success());
+        assert_eq!(
+            std::fs::read_to_string(&settings).unwrap(),
+            "{}
+"
+        );
+    }
+}
+
+#[test]
+fn disabling_outside_a_plugin_install_leaves_settings_alone() {
+    let project = tempfile::tempdir().unwrap();
+    let output = decide(project.path(), "off");
+    assert!(output.status.success());
+    assert!(!project.path().join(".claude/settings.local.json").exists());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("left untouched"));
+}
