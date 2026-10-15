@@ -3,6 +3,7 @@
 pub mod atomic;
 pub mod date;
 pub mod decision;
+pub mod secrets;
 pub mod settings;
 
 /// Version of the Context Wizard binary, identical to the plugin version.
