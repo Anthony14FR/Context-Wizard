@@ -1,0 +1,21 @@
+[package]
+name = "wizard-store"
+description = "SQLite persistence of the Context Wizard index, with content hashes for change detection."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+blake3.workspace = true
+rayon.workspace = true
+rusqlite.workspace = true
+wizard-scan.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
