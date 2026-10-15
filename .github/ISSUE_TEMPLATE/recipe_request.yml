@@ -1,0 +1,32 @@
+name: Recipe request
+description: Ask for framework knowledge, such as routes, models or components.
+labels: ["type: feature", "area: recipes", "status: needs triage"]
+body:
+  - type: input
+    id: framework
+    attributes:
+      label: Framework
+      placeholder: "Django 6"
+    validations:
+      required: true
+  - type: textarea
+    id: detection
+    attributes:
+      label: How to detect it
+      description: Files or manifest entries that identify a project using this framework.
+      placeholder: "manage.py at the root, django in pyproject.toml"
+    validations:
+      required: true
+  - type: textarea
+    id: extract
+    attributes:
+      label: What to extract
+      description: The concepts Claude should see in the map, with their usual locations.
+      placeholder: "URL patterns in urls.py, models in models.py"
+    validations:
+      required: true
+  - type: input
+    id: example
+    attributes:
+      label: Example repository
+      description: A public repository that uses the framework, to test the recipe.
