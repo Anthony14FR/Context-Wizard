@@ -4,6 +4,7 @@ mod decide;
 mod event;
 mod hook;
 mod opt_in;
+mod status;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -31,6 +32,12 @@ enum Command {
         #[arg(long, default_value = ".")]
         project: PathBuf,
     },
+    /// Shows whether Context Wizard is enabled for a project and whether its binary is healthy.
+    Status {
+        /// Project root. Defaults to the current directory.
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+    },
 }
 
 /// Answer to the opt-in question.
@@ -48,6 +55,7 @@ fn main() -> ExitCode {
         Some(Command::Decide { answer, project }) => {
             decide::run(&project, matches!(answer, Answer::On))
         }
+        Some(Command::Status { project }) => status::run(&project),
         None => ExitCode::SUCCESS,
     }
 }
