@@ -166,3 +166,38 @@ fn disabling_outside_a_plugin_install_leaves_settings_alone() {
     assert!(!project.path().join(".claude/settings.local.json").exists());
     assert!(String::from_utf8_lossy(&output.stderr).contains("left untouched"));
 }
+
+fn hook_with_plugin_version(project: &Path, version: &str) -> Output {
+    let plugin = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(plugin.path().join(".claude-plugin")).unwrap();
+    std::fs::write(
+        plugin.path().join(".claude-plugin/plugin.json"),
+        format!(r#"{{"name": "context-wizard", "version": "{version}"}}"#),
+    )
+    .unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_wizard"))
+        .arg("hook")
+        .env("CLAUDE_PROJECT_DIR", project)
+        .env("CLAUDE_PLUGIN_ROOT", plugin.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(br#"{"hook_event_name":"UserPromptSubmit"}"#)
+        .unwrap();
+    child.wait_with_output().unwrap()
+}
+
+#[test]
+fn stays_inert_when_the_plugin_version_differs() {
+    let project = tempfile::tempdir().unwrap();
+    let mismatched = hook_with_plugin_version(project.path(), "999.0.0");
+    assert!(mismatched.status.success());
+    assert_eq!(String::from_utf8_lossy(&mismatched.stdout), "");
+    let matching = hook_with_plugin_version(project.path(), env!("CARGO_PKG_VERSION"));
+    assert!(context(&matching).contains("decide on --project"));
+}
