@@ -50,6 +50,7 @@ fn skips_vcs_and_wizard_directories_but_keeps_hidden_files() {
     let root = tempfile::tempdir().unwrap();
     write(root.path(), ".git/config", b"[core]\n");
     write(root.path(), ".wizard/index.db", b"cache\n");
+    write(root.path(), ".claude/settings.local.json", b"{}\n");
     write(root.path(), ".github/workflows/ci.yml", b"name: CI\n");
     write(root.path(), ".env.example", b"KEY=\n");
     assert_eq!(
