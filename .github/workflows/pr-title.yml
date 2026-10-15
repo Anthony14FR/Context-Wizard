@@ -37,6 +37,7 @@ jobs:
             learn
             recipes
             store
+            index
             mcp
             cli
             hooks
