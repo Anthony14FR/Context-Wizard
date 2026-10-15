@@ -112,11 +112,22 @@ fn installed_binary(data_dir_name: &str) -> (tempfile::TempDir, std::path::PathB
 }
 
 fn decide_with(binary: &Path, project: &Path, answer: &str) -> Output {
-    Command::new(binary)
-        .args(["decide", answer, "--project"])
-        .arg(project)
-        .output()
-        .unwrap()
+    let mut attempt = 0;
+    loop {
+        let result = Command::new(binary)
+            .args(["decide", answer, "--project"])
+            .arg(project)
+            .output();
+        match result {
+            Err(error)
+                if error.kind() == std::io::ErrorKind::ExecutableFileBusy && attempt < 20 =>
+            {
+                attempt += 1;
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            result => return result.unwrap(),
+        }
+    }
 }
 
 #[test]

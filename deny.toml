@@ -27,6 +27,10 @@ allow = [
     "Unicode-3.0",
 ]
 confidence-threshold = 0.93
+exceptions = [
+    { crate = "option-ext", allow = ["MPL-2.0"] },
+    { crate = "webpki-roots", allow = ["CDLA-Permissive-2.0"] },
+]
 
 [licenses.private]
 ignore = true

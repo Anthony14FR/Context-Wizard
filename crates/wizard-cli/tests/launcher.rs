@@ -323,6 +323,7 @@ fn launcher_keeps_non_ascii_output_intact() {
     let bin = data.path().join("bin");
     std::fs::create_dir_all(&bin).unwrap();
     std::fs::copy(env!("CARGO_BIN_EXE_wizard"), bin.join(binary_name())).unwrap();
+    wait_until_executable(&bin.join(binary_name()));
     let root = plugin_copy("http://127.0.0.1:9", "");
     for shell in shells() {
         let launch = Launch {
@@ -335,5 +336,16 @@ fn launcher_keeps_non_ascii_output_intact() {
         assert_question(&shell, &output);
         let text = String::from_utf8(output.stdout).unwrap();
         assert!(text.contains("projet-été"), "{shell:?}: {text}");
+    }
+}
+
+fn wait_until_executable(binary: &Path) {
+    for _ in 0..40 {
+        match Command::new(binary).arg("--version").output() {
+            Err(error) if error.kind() == std::io::ErrorKind::ExecutableFileBusy => {
+                thread::sleep(std::time::Duration::from_millis(50));
+            }
+            _ => return,
+        }
     }
 }
