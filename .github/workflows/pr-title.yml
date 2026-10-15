@@ -1,0 +1,52 @@
+name: PR title
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  conventional:
+    name: Conventional Commits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            test
+            docs
+            build
+            ci
+            chore
+          scopes: |
+            core
+            adr
+            scan
+            parse
+            graph
+            budget
+            git
+            learn
+            recipes
+            store
+            mcp
+            cli
+            hooks
+            plugin
+            install
+            release
+            bench
+            ci
+            docs
+            deps
+          requireScope: false
+          subjectPattern: ^(?![A-Z])(?=.{1,72}$).*[^.]$
+          subjectPatternError: The subject must start with a lowercase letter, have at most 72 characters and not end with a period.
