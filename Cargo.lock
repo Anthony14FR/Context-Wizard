@@ -1615,6 +1615,7 @@ dependencies = [
 name = "wizard-parse"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
  "streaming-iterator",
  "tree-sitter",
  "tree-sitter-language-pack",
