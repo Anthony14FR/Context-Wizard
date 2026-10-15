@@ -32,3 +32,23 @@ fn rejects_unknown_arguments() {
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(stderr.contains("unexpected argument"));
 }
+
+#[test]
+fn hook_is_silent_on_any_input() {
+    for input in [
+        &b"{\"hook_event_name\":\"SessionStart\"}"[..],
+        b"not json",
+        b"",
+    ] {
+        let mut child = wizard()
+            .arg("hook")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        std::io::Write::write_all(&mut child.stdin.take().unwrap(), input).unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(output.status.success());
+        assert_eq!(String::from_utf8_lossy(&output.stdout), "");
+    }
+}
