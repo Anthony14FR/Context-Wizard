@@ -1,0 +1,24 @@
+[package]
+name = "wizard-index"
+description = "Index building and context maps of Context Wizard: the pipeline from files to stored symbols, the L0 overview and the L1 map."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rayon.workspace = true
+serde_json.workspace = true
+wizard-budget.workspace = true
+wizard-core.workspace = true
+wizard-parse.workspace = true
+wizard-scan.workspace = true
+wizard-store.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -13,6 +13,7 @@ publish = false
 [workspace.dependencies]
 wizard-budget = { path = "crates/wizard-budget" }
 wizard-core = { path = "crates/wizard-core" }
+wizard-index = { path = "crates/wizard-index" }
 wizard-parse = { path = "crates/wizard-parse" }
 wizard-scan = { path = "crates/wizard-scan" }
 wizard-store = { path = "crates/wizard-store" }

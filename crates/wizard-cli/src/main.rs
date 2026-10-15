@@ -3,6 +3,8 @@
 mod decide;
 mod event;
 mod hook;
+mod index;
+mod install;
 mod opt_in;
 mod status;
 
@@ -32,6 +34,12 @@ enum Command {
         #[arg(long, default_value = ".")]
         project: PathBuf,
     },
+    /// Builds or updates the index of an enabled project.
+    Index {
+        /// Project root. Defaults to the current directory.
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+    },
     /// Shows whether Context Wizard is enabled for a project and whether its binary is healthy.
     Status {
         /// Project root. Defaults to the current directory.
@@ -55,6 +63,7 @@ fn main() -> ExitCode {
         Some(Command::Decide { answer, project }) => {
             decide::run(&project, matches!(answer, Answer::On))
         }
+        Some(Command::Index { project }) => index::run(&project),
         Some(Command::Status { project }) => status::run(&project),
         None => ExitCode::SUCCESS,
     }
