@@ -1,0 +1,15 @@
+[package]
+name = "wizard-git"
+description = "Git history signals for Context Wizard: churn, co-change and renames, read through the git command line."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

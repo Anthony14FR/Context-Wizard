@@ -1828,6 +1828,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "wizard-git"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
 name = "wizard-graph"
 version = "0.1.0"
 dependencies = [
