@@ -1,0 +1,57 @@
+name: Bug report
+description: Something does not work as documented.
+labels: ["type: bug", "status: needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for the report. Please search existing issues first.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a project with ...
+        2. Run ...
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of /context-wizard:status
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Context Wizard version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: claude-code
+    attributes:
+      label: Claude Code version
+      placeholder: "2.1.300"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+    validations:
+      required: true
+  - type: input
+    id: stack
+    attributes:
+      label: Project technology
+      description: Languages and frameworks of the project where the bug happens.
