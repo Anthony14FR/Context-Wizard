@@ -1599,6 +1599,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "wizard-core",
+ "wizard-index",
 ]
 
 [[package]]
@@ -1609,6 +1610,20 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "wizard-index"
+version = "0.1.0"
+dependencies = [
+ "rayon",
+ "serde_json",
+ "tempfile",
+ "wizard-budget",
+ "wizard-core",
+ "wizard-parse",
+ "wizard-scan",
+ "wizard-store",
 ]
 
 [[package]]
