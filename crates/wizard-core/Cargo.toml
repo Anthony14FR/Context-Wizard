@@ -1,0 +1,12 @@
+[package]
+name = "wizard-core"
+description = "Domain types, configuration and errors shared by every Context Wizard crate."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
