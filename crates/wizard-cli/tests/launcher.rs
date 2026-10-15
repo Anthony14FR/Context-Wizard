@@ -2,8 +2,11 @@
 
 #![allow(clippy::unwrap_used)]
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+
+const PROMPT: &str = r#"{"hook_event_name":"UserPromptSubmit","prompt":"café ✓"}"#;
 
 fn plugin_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../plugin")
@@ -52,23 +55,62 @@ fn shells() -> Vec<Vec<String>> {
     }
 }
 
-fn run(shell: &[String], data: &Path) -> Output {
-    Command::new(&shell[0])
+fn run(shell: &[String], data: &Path, project: &Path, input: &str) -> Output {
+    let mut child = Command::new(&shell[0])
         .args(&shell[1..])
         .arg(launcher_command())
         .env("CLAUDE_PLUGIN_DATA", data)
-        .stdin(Stdio::null())
-        .output()
+        .env("CLAUDE_PROJECT_DIR", project)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
         .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+    child.wait_with_output().unwrap()
+}
+
+fn install_binary(data: &Path) {
+    let name = if cfg!(windows) {
+        "wizard.exe"
+    } else {
+        "wizard"
+    };
+    let bin = data.join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    std::fs::copy(env!("CARGO_BIN_EXE_wizard"), bin.join(name)).unwrap();
 }
 
 #[test]
 fn launcher_is_silent_without_binary() {
     let data = tempfile::tempdir().unwrap();
+    let project = tempfile::tempdir().unwrap();
     for shell in shells() {
-        let output = run(&shell, data.path());
+        let output = run(&shell, data.path(), project.path(), PROMPT);
         assert!(output.status.success(), "{shell:?}: {output:?}");
         assert!(output.stdout.is_empty(), "{shell:?}: {output:?}");
         assert!(output.stderr.is_empty(), "{shell:?}: {output:?}");
+    }
+}
+
+#[test]
+fn launcher_hands_the_event_to_the_installed_binary() {
+    let data = tempfile::tempdir().unwrap();
+    let project = tempfile::tempdir().unwrap();
+    install_binary(data.path());
+    for shell in shells() {
+        let output = run(&shell, data.path(), project.path(), PROMPT);
+        assert!(output.status.success(), "{shell:?}: {output:?}");
+        let value: serde_json::Value = serde_json::from_slice(&output.stdout)
+            .unwrap_or_else(|error| panic!("{shell:?}: {error}: {output:?}"));
+        let context = value["hookSpecificOutput"]["additionalContext"]
+            .as_str()
+            .unwrap();
+        assert!(context.contains("decide on --project"), "{shell:?}");
     }
 }
