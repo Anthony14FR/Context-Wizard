@@ -76,7 +76,7 @@ Refs: #<issue>
 Signed-off-by: Name <email>
 ```
 
-Scopes: `core`, `adr`, `scan`, `parse`, `graph`, `budget`, `git`, `learn`, `recipes`, `store`, `mcp`, `cli`, `hooks`, `plugin`, `install`, `release`, `bench`, `ci`, `docs`, `deps`.
+Scopes: `core`, `adr`, `scan`, `parse`, `graph`, `budget`, `git`, `learn`, `recipes`, `store`, `index`, `mcp`, `cli`, `hooks`, `plugin`, `install`, `release`, `bench`, `ci`, `docs`, `deps`.
 
 - The subject uses the imperative mood, is lowercase, has no final period and has at most 72 characters.
 - The body explains why. The diff already shows what.
