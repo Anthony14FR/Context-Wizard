@@ -2,7 +2,8 @@
 //!
 //! The walk honours `.gitignore`, `.ignore`, `.git/info/exclude` and `.wizardignore` files inside
 //! the project only: neither the user's global git ignore file nor ignore files in directories
-//! above the root apply. It skips version control and Context Wizard entries whatever their
+//! above the root apply. It skips version control, Claude Code settings and Context Wizard
+//! entries whatever their
 //! case, symbolic links, binary files (a NUL byte in the first 8 KiB, which also covers UTF-16
 //! text) and oversized files, and returns files sorted by path so the same tree always gives the
 //! same result. Empty files are kept.
@@ -20,7 +21,7 @@ pub mod projects;
 /// Name of the project-level ignore file read in addition to `.gitignore`.
 pub const IGNORE_FILE: &str = ".wizardignore";
 
-const SKIPPED_DIRECTORIES: [&str; 4] = [".git", ".hg", ".svn", ".wizard"];
+const SKIPPED_DIRECTORIES: [&str; 5] = [".claude", ".git", ".hg", ".svn", ".wizard"];
 const SNIFF_BYTES: usize = 8 * 1024;
 
 /// Limits applied while scanning.
