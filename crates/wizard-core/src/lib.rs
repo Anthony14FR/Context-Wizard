@@ -1,5 +1,9 @@
 //! Domain types, configuration and errors shared by every Context Wizard crate.
 
+pub mod atomic;
+pub mod date;
+pub mod decision;
+
 /// Version of the Context Wizard binary, identical to the plugin version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
