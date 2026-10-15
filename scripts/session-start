@@ -1,7 +1,91 @@
 [ -n "${CLAUDE_PLUGIN_DATA:-}" ] || exit 0
-wizard_bin="${CLAUDE_PLUGIN_DATA}/bin/wizard"
+
+wizard_lock="../binaries.lock.json"
+wizard_bin_dir="$(printf '%s' "$CLAUDE_PLUGIN_DATA" | tr '\\' '/')/bin"
+wizard_suffix=""
 case "$(uname -s)" in
-  MINGW* | MSYS* | CYGWIN*) wizard_bin="${wizard_bin}.exe" ;;
+  Linux) wizard_os="unknown-linux-musl" ;;
+  Darwin) wizard_os="apple-darwin" ;;
+  MINGW* | MSYS* | CYGWIN*) wizard_os="pc-windows-msvc" wizard_suffix=".exe" ;;
+  *) exit 0 ;;
 esac
+case "$(uname -m)" in
+  x86_64 | amd64) wizard_arch="x86_64" ;;
+  aarch64 | arm64) wizard_arch="aarch64" ;;
+  *) exit 0 ;;
+esac
+case "${PROCESSOR_ARCHITECTURE:-}${PROCESSOR_ARCHITEW6432:-}" in
+  *ARM64*) wizard_arch="aarch64" ;;
+esac
+wizard_target="${wizard_arch}-${wizard_os}"
+wizard_bin="${wizard_bin_dir}/wizard${wizard_suffix}"
+
+wizard_json() {
+  sed -n "s/^ *\"$1\": *\"\([^\"]*\)\".*/\1/p" "$wizard_lock" 2>/dev/null | head -n 1
+}
+
+wizard_fetch() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --retry 1 --connect-timeout 10 --max-time 50 -o "$2" "$1"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -T 50 -t 2 -O "$2" "$1"
+  else
+    return 1
+  fi
+}
+
+wizard_sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d ' ' -f 1
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | cut -d ' ' -f 1
+  else
+    openssl dgst -sha256 -r "$1" | cut -d ' ' -f 1
+  fi
+}
+
+wizard_place() {
+  cp "$1" "${wizard_bin}.$$" || return 1
+  if [ -n "$wizard_suffix" ] && [ -e "$wizard_bin" ]; then
+    mv -f "$wizard_bin" "${wizard_bin}.old.$$" || return 1
+  fi
+  if ! mv -f "${wizard_bin}.$$" "$wizard_bin"; then
+    mv -f "${wizard_bin}.old.$$" "$wizard_bin" 2>/dev/null
+    return 1
+  fi
+  rm -f "${wizard_bin}.old.$$" 2>/dev/null
+  printf '%s\n' "$wizard_version" > "${wizard_bin_dir}/current.$$" &&
+    mv -f "${wizard_bin_dir}/current.$$" "${wizard_bin_dir}/current"
+}
+
+wizard_install() {
+  wizard_url=$(wizard_json url)
+  wizard_sha=$(wizard_json "$wizard_target")
+  [ -n "$wizard_url" ] && [ -n "$wizard_sha" ] || return 1
+  wizard_dir="${wizard_bin_dir}/${wizard_version}"
+  wizard_download="${wizard_dir}/.download.$$"
+  mkdir -p "$wizard_dir" || return 1
+  if wizard_fetch "${wizard_url}/wizard-${wizard_target}${wizard_suffix}" "$wizard_download" &&
+    [ "$(wizard_sha256 "$wizard_download" | tr 'A-F' 'a-f')" = "$(printf '%s' "$wizard_sha" | tr 'A-F' 'a-f')" ] &&
+    chmod +x "$wizard_download" &&
+    mv -f "$wizard_download" "${wizard_dir}/wizard${wizard_suffix}"; then
+    wizard_place "${wizard_dir}/wizard${wizard_suffix}"
+  else
+    rm -f "$wizard_download" "${wizard_bin}.$$"
+    return 1
+  fi
+}
+
+wizard_version=$(wizard_json version)
+if [ -n "$wizard_version" ] &&
+  { [ ! -x "$wizard_bin" ] || [ "$(cat "${wizard_bin_dir}/current" 2>/dev/null)" != "$wizard_version" ]; }; then
+  if wizard_install >/dev/null 2>&1; then
+    rm -f "${wizard_bin_dir}/install-error"
+  else
+    mkdir -p "$wizard_bin_dir" 2>/dev/null &&
+      printf '%s %s
+' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "download or verification of ${wizard_target} ${wizard_version} failed" > "${wizard_bin_dir}/install-error" 2>/dev/null
+  fi
+fi
 [ -x "$wizard_bin" ] || exit 0
 exec "$wizard_bin" hook
