@@ -1,0 +1,14 @@
+{
+  "name": "context-wizard",
+  "displayName": "Context Wizard",
+  "version": "0.1.0",
+  "description": "Gives Claude the right codebase context at the right time, for the fewest tokens, on any project.",
+  "author": {
+    "name": "Anthony14FR",
+    "url": "https://github.com/Anthony14FR"
+  },
+  "homepage": "https://github.com/Anthony14FR/Context-Wizard",
+  "repository": "https://github.com/Anthony14FR/Context-Wizard",
+  "license": "MIT OR Apache-2.0",
+  "keywords": ["context", "codebase", "repository-map", "tokens", "tree-sitter", "learning"]
+}
