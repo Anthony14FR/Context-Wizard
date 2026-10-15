@@ -1,0 +1,12 @@
+[package]
+name = "wizard-budget"
+description = "Token estimation and budget selection for Context Wizard, without a tokenizer."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
