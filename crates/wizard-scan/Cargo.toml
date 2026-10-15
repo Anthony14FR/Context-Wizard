@@ -1,0 +1,18 @@
+[package]
+name = "wizard-scan"
+description = "File walking with ignore rules, binary detection and size limits for Context Wizard."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+ignore.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
