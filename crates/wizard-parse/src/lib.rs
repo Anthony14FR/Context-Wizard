@@ -1,5 +1,8 @@
 //! Language detection and syntax extraction for Context Wizard, on top of tree-sitter.
 
+pub mod extract;
+pub mod grammar;
+
 /// Returns the tree-sitter language of a file from its path, or from its first line when the
 /// path is not enough, such as a script with a shebang and no extension.
 #[must_use]
