@@ -17,8 +17,12 @@ use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use rusqlite::{Connection, ErrorCode, OptionalExtension, TransactionBehavior, params};
 use wizard_scan::FileEntry;
 
+mod symbols;
+
+pub use symbols::{FileRecord, FileSymbols, LocatedSymbol, SymbolKind, SymbolRecord};
+
 /// Version of the index schema. A different version on disk triggers a rebuild.
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 
 /// Directory holding Context Wizard data, relative to the project root.
 pub const DATA_DIRECTORY: &str = ".wizard";
@@ -36,8 +40,21 @@ const SCHEMA: &str = "
         size INTEGER NOT NULL,
         modified INTEGER,
         hash BLOB NOT NULL,
-        indexed_at INTEGER NOT NULL
+        indexed_at INTEGER NOT NULL,
+        language TEXT
     ) STRICT;
+    CREATE TABLE symbols (
+        path TEXT NOT NULL REFERENCES files (path) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        name TEXT NOT NULL,
+        role TEXT NOT NULL,
+        line INTEGER NOT NULL,
+        end_line INTEGER NOT NULL,
+        signature TEXT NOT NULL,
+        count INTEGER NOT NULL
+    ) STRICT;
+    CREATE INDEX symbols_by_path ON symbols (path);
+    CREATE INDEX symbols_by_name ON symbols (name);
 ";
 
 /// Failure to open or update the index.
@@ -348,10 +365,12 @@ fn try_connect(path: &Path) -> Result<Index, StoreError> {
         connection.pragma_update(None, "journal_mode", "WAL")?;
     }
     connection.pragma_update(None, "synchronous", "NORMAL")?;
+    connection.pragma_update(None, "foreign_keys", "ON")?;
     if schema_version(&connection)? != SCHEMA_VERSION {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         if schema_version(&transaction)? != SCHEMA_VERSION {
-            transaction.execute_batch("DROP TABLE IF EXISTS files;")?;
+            transaction
+                .execute_batch("DROP TABLE IF EXISTS symbols; DROP TABLE IF EXISTS files;")?;
             transaction.execute_batch(SCHEMA)?;
             transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         }
