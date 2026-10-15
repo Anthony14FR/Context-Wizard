@@ -1,0 +1,14 @@
+# Rust build output
+/target/
+**/*.rs.bk
+*.pdb
+
+# Context Wizard data when the plugin runs on this repository
+.wizard/
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

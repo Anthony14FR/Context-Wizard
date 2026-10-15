@@ -1,0 +1,18 @@
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.ps1  text eol=lf
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+
+*.png  binary
+*.jpg  binary
+*.gif  binary
+*.ico  binary
+*.zip  binary
+*.gz   binary
+*.wasm binary
+*.db   binary
+
+Cargo.lock linguist-generated=true
+tests/fixtures/** linguist-vendored=true
