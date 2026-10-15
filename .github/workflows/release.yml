@@ -23,51 +23,23 @@ env:
   VERSION: ${{ inputs.version }}
 
 jobs:
-  prepare:
-    name: Prepare version
+  check:
+    name: Check version
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    outputs:
-      branch: ${{ steps.branch.outputs.name }}
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Check the version
-        run: |
+        with:
+          persist-credentials: false
+      - run: |
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "invalid version $VERSION"; exit 1; }
           if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null; then
             echo "tag v$VERSION already exists"; exit 1
           fi
-      - run: rustup toolchain install
-      - name: Bump the crate version
-        run: |
-          sed -i "0,/^version = \".*\"$/s//version = \"$VERSION\"/" Cargo.toml
-          cargo update --workspace --offline || cargo update --workspace
-      - id: branch
-        name: Push the release branch
-        run: |
-          name="release/v$VERSION"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "$name"
-          if ! git diff --quiet; then
-            git commit -am "chore(release): set version $VERSION"
-          fi
-          if [ "${{ inputs.dry_run }}" = "false" ]; then
-            git push origin "$name"
-          fi
-          git bundle create release.bundle "$name"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: release-branch
-          path: release.bundle
-          retention-days: 7
 
   build:
     name: Build (${{ matrix.target }})
-    needs: prepare
+    needs: check
     strategy:
       fail-fast: false
       matrix:
@@ -84,18 +56,17 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          name: release-branch
-      - name: Check out the release branch
-        run: |
-          git clone --quiet release.bundle source
-          cd source && git checkout --quiet "${{ needs.prepare.outputs.branch }}"
+          persist-credentials: false
       - name: Install the toolchain
-        working-directory: source
         run: |
           rustup toolchain install
           rustup target add ${{ matrix.target }}
+      - name: Set the version
+        run: |
+          sed -i.bak "0,/^version = \".*\"$/s//version = \"$VERSION\"/" Cargo.toml && rm Cargo.toml.bak
+          cargo update --workspace
       - if: matrix.zig
         uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
@@ -105,7 +76,6 @@ jobs:
         with:
           tool: cargo-zigbuild
       - name: Build
-        working-directory: source
         run: |
           if [ "${{ matrix.zig }}" = "true" ]; then
             cargo zigbuild --release --locked -p wizard-cli --target ${{ matrix.target }}
@@ -117,7 +87,7 @@ jobs:
           suffix=""
           case "${{ matrix.target }}" in *windows*) suffix=".exe" ;; esac
           mkdir dist
-          cp "source/target/${{ matrix.target }}/release/wizard$suffix" "dist/wizard-${{ matrix.target }}$suffix"
+          cp "target/${{ matrix.target }}/release/wizard$suffix" "dist/wizard-${{ matrix.target }}$suffix"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wizard-${{ matrix.target }}
@@ -127,12 +97,15 @@ jobs:
 
   publish:
     name: Pin and publish
-    needs: [prepare, build]
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: artifacts
@@ -144,21 +117,23 @@ jobs:
           [ "$count" -eq 6 ] || { echo "expected 6 binaries, found $count"; ls dist; exit 1; }
           (cd dist && sha256sum wizard-* | sort -k 2 > SHA256SUMS)
           cat dist/SHA256SUMS
-      - name: Check out the release branch
+      - run: rustup toolchain install
+      - name: Commit the version and the pinned binaries
         run: |
-          git clone --quiet artifacts/release-branch/release.bundle source
-          cd source && git checkout --quiet "${{ needs.prepare.outputs.branch }}"
-      - name: Pin the binaries and bump the plugin version
-        working-directory: source
-        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          sed -i "0,/^version = \".*\"$/s//version = \"$VERSION\"/" Cargo.toml
+          cargo update --workspace
+          if ! git diff --quiet; then
+            git commit -am "chore(release): set version $VERSION"
+          fi
           python3 - <<'PY'
           import json, os, pathlib
           version = os.environ["VERSION"]
           sums = {}
-          for line in pathlib.Path("../dist/SHA256SUMS").read_text().splitlines():
+          for line in pathlib.Path("dist/SHA256SUMS").read_text().splitlines():
               digest, name = line.split()
-              target = name.removeprefix("wizard-").removesuffix(".exe")
-              sums[target] = digest
+              sums[name.removeprefix("wizard-").removesuffix(".exe")] = digest
           lock = {
               "version": version,
               "url": f"https://github.com/Anthony14FR/Context-Wizard/releases/download/v{version}",
@@ -170,19 +145,17 @@ jobs:
           manifest["version"] = version
           manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
           PY
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -am "chore(release): pin binaries for v$VERSION"
           git log --oneline -3
-      - name: Tag, push and publish
+      - name: Tag, publish, then update the default branch
         if: ${{ !inputs.dry_run }}
-        working-directory: source
         env:
           GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git fetch --quiet origin "$DEFAULT_BRANCH"
+          [ "$(git rev-parse "origin/$DEFAULT_BRANCH")" = "${{ github.sha }}" ] || { echo "$DEFAULT_BRANCH moved during the release; run it again"; exit 1; }
           git tag "v$VERSION"
           git push origin "v$VERSION"
-          gh release create "v$VERSION" ../dist/* --verify-tag --title "v$VERSION" --notes "See CHANGELOG.md for the changes in this release."
-          git push origin "HEAD:${{ github.event.repository.default_branch }}"
-          git push origin --delete "${{ needs.prepare.outputs.branch }}"
+          gh release create "v$VERSION" dist/* --verify-tag --title "v$VERSION" --notes "See CHANGELOG.md for the changes in this release."
+          git push origin "HEAD:$DEFAULT_BRANCH"
