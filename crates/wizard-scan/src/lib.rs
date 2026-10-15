@@ -15,6 +15,8 @@ use std::time::SystemTime;
 
 use ignore::{WalkBuilder, WalkState};
 
+pub mod projects;
+
 /// Name of the project-level ignore file read in addition to `.gitignore`.
 pub const IGNORE_FILE: &str = ".wizardignore";
 

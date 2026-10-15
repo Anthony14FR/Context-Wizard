@@ -1,0 +1,15 @@
+[package]
+name = "wizard-parse"
+description = "Language detection and syntax extraction for Context Wizard, on top of tree-sitter."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+tree-sitter-language-pack.workspace = true
+
+[lints]
+workspace = true
