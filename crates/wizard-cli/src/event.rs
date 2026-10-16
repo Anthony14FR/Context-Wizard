@@ -30,6 +30,12 @@ pub(crate) struct Event {
     /// Working directory of the session.
     #[serde(default)]
     pub(crate) cwd: Option<PathBuf>,
+    /// Name of the tool, for tool events.
+    #[serde(default)]
+    pub(crate) tool_name: Option<String>,
+    /// Arguments of the tool, for tool events.
+    #[serde(default)]
+    pub(crate) tool_input: Option<serde_json::Value>,
 }
 
 impl Event {
