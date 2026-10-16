@@ -201,3 +201,31 @@ fn stays_inert_when_the_plugin_version_differs() {
     let matching = hook_with_plugin_version(project.path(), env!("CARGO_PKG_VERSION"));
     assert!(context(&matching).contains("decide on --project"));
 }
+
+#[test]
+fn enabled_projects_get_the_overview_at_session_start() {
+    let project = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(project.path().join("src")).unwrap();
+    std::fs::write(
+        project.path().join("Cargo.toml"),
+        "[package]\nname = \"demo\"\n",
+    )
+    .unwrap();
+    std::fs::write(project.path().join("src/main.rs"), "fn main() {}\n").unwrap();
+    let decided = decide(project.path(), "on");
+    assert!(decided.status.success());
+    assert!(String::from_utf8_lossy(&decided.stdout).contains("# Project overview"));
+    let output = hook(project.path(), "SessionStart");
+    assert!(output.status.success());
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["hookSpecificOutput"]["hookEventName"], "SessionStart");
+    let overview = value["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .unwrap();
+    assert!(
+        overview.contains("# Project overview (Context Wizard)"),
+        "{overview}"
+    );
+    assert!(overview.contains("- src/main.rs"), "{overview}");
+    assert!(overview.len() < 10_000);
+}

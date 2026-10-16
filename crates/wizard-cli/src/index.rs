@@ -4,9 +4,9 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use wizard_core::decision;
-use wizard_index::build::{BuildOptions, build};
+use wizard_index::build::build;
 
-use crate::install;
+use crate::context;
 
 /// Builds the index of `project` and prints a one-line summary.
 #[allow(
@@ -21,11 +21,7 @@ pub(crate) fn run(project: &Path) -> ExitCode {
         );
         return ExitCode::FAILURE;
     }
-    let options = BuildOptions {
-        grammar_cache: install::data_dir().map(|data| data.join("grammars")),
-        ..BuildOptions::default()
-    };
-    match build(project, &options) {
+    match build(project, &context::build_options()) {
         Ok(report) => {
             println!(
                 "Indexed {} files in {:.1?}: {} added, {} modified, {} removed, {} parsed, {} lexical.",

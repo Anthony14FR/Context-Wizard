@@ -1,5 +1,8 @@
 //! Tests of the plugin's polyglot `SessionStart` launcher in every shell Claude Code may use:
 //! hand-off to the installed binary, first-run download, checksum check and proxy support.
+//!
+//! Shell-form hook commands reach sh and bash unsubstituted, with `CLAUDE_PLUGIN_ROOT` in the
+//! environment, and reach PowerShell with the path substituted, as Claude Code runs them.
 
 #![allow(clippy::unwrap_used, clippy::panic)]
 
@@ -35,13 +38,22 @@ fn forward_slashes(path: &Path) -> String {
     text.strip_prefix("//?/").unwrap_or(&text).to_owned()
 }
 
-fn launcher_command(root: &Path) -> String {
+fn raw_launcher_command(root: &Path) -> String {
     let hooks = std::fs::read_to_string(root.join("hooks/hooks.json")).unwrap();
     let hooks: serde_json::Value = serde_json::from_str(&hooks).unwrap();
-    let command = hooks["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+    hooks["hooks"]["SessionStart"][0]["hooks"][0]["command"]
         .as_str()
-        .unwrap();
-    command.replace("${CLAUDE_PLUGIN_ROOT}", &forward_slashes(root))
+        .unwrap()
+        .to_owned()
+}
+
+fn launcher_command(shell: &[String], root: &Path) -> String {
+    let raw = raw_launcher_command(root);
+    if shell[0].contains("powershell") || shell[0].contains("pwsh") {
+        raw.replace("${CLAUDE_PLUGIN_ROOT}", &forward_slashes(root))
+    } else {
+        raw
+    }
 }
 
 fn git_bash() -> Option<PathBuf> {
@@ -97,7 +109,8 @@ impl Launch<'_> {
         let mut command = Command::new(&shell[0]);
         command
             .args(&shell[1..])
-            .arg(launcher_command(self.root))
+            .arg(launcher_command(shell, self.root))
+            .env("CLAUDE_PLUGIN_ROOT", forward_slashes(self.root))
             .env("CLAUDE_PLUGIN_DATA", self.data)
             .env("CLAUDE_PROJECT_DIR", self.project)
             .env_remove("HTTPS_PROXY")

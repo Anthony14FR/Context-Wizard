@@ -1,5 +1,6 @@
 //! The `wizard` binary: hook commands and the MCP server of Context Wizard.
 
+mod context;
 mod decide;
 mod event;
 mod hook;
