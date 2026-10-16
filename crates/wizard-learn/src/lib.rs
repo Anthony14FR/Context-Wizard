@@ -2,7 +2,9 @@
 //!
 //! Hooks record what happens in each Claude Code session of an enabled project: the prompts,
 //! the files read, the searches and their result counts, the files edited, and the end of each
-//! answer. Events are linked by session and kept in `.wizard/learn.db`.
+//! answer. Events are linked by session and kept in `.wizard/learn.db`. Each `Stop`
+//! consolidates its session into per-file outcomes and map gaps, from which the learning
+//! signals are read.
 //!
 //! Unlike the index, this store cannot be rebuilt from the project, so a schema change migrates
 //! it instead of dropping it. A database written by a newer build is left untouched, and a
@@ -17,16 +19,23 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use rusqlite::{Connection, ErrorCode, OptionalExtension, Row, TransactionBehavior, params};
 use wizard_store::{StoreError, data_directory};
 
+mod signals;
+
+pub use signals::{
+    CO_ACCESS_MAX_FILES, CoAccess, FileSignal, Gap, Outcome, PIVOT_SESSIONS, consolidate_events,
+};
+
 /// File name of the learning store inside the `.wizard` directory.
 pub const LEARN_FILE: &str = "learn.db";
 
 /// Version of the learning store schema written by this build.
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 
 const OPEN_ATTEMPTS: u32 = 50;
 const OPEN_BACKOFF: Duration = Duration::from_millis(20);
 
-const MIGRATIONS: [&str; 1] = ["
+const MIGRATIONS: [&str; 2] = [
+    "
     CREATE TABLE sessions (
         id TEXT PRIMARY KEY NOT NULL,
         started INTEGER NOT NULL,
@@ -46,7 +55,26 @@ const MIGRATIONS: [&str; 1] = ["
     ) STRICT;
     CREATE INDEX events_by_session ON events (session, id);
     CREATE INDEX events_by_path ON events (path);
-"];
+",
+    "
+    CREATE TABLE outcomes (
+        session TEXT NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+        path TEXT NOT NULL,
+        reads INTEGER NOT NULL,
+        edited INTEGER NOT NULL,
+        at INTEGER NOT NULL,
+        PRIMARY KEY (session, path)
+    ) STRICT;
+    CREATE INDEX outcomes_by_path ON outcomes (path);
+    CREATE TABLE gaps (
+        session TEXT NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+        pattern TEXT NOT NULL,
+        followed_by TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        PRIMARY KEY (session, pattern)
+    ) STRICT;
+",
+];
 
 /// Failure to open or update the learning store.
 #[derive(Debug)]
@@ -421,7 +449,7 @@ fn set_aside(path: &Path) {
 mod tests {
     #![allow(clippy::unwrap_used)]
 
-    use super::{Event, EventKind, LEARN_FILE, Learn, LearnError, SCHEMA_VERSION};
+    use super::{Event, EventKind, LEARN_FILE, Learn, LearnError, MIGRATIONS, SCHEMA_VERSION};
 
     fn read(session: &str, at: i64, path: &str) -> Event {
         Event {
@@ -467,6 +495,26 @@ mod tests {
             .unwrap();
         let learn = Learn::open_project(project.path()).unwrap();
         assert_eq!(learn.events("a").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn migrates_an_older_store_and_keeps_its_events() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join(LEARN_FILE);
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        connection.execute_batch(MIGRATIONS[0]).unwrap();
+        connection
+            .execute_batch(
+                "INSERT INTO sessions (id, started) VALUES ('a', 1);
+                 INSERT INTO events (session, at, kind, path) VALUES ('a', 1, 'read', 'x.rs');
+                 PRAGMA user_version = 1;",
+            )
+            .unwrap();
+        drop(connection);
+        let mut learn = Learn::open(&path).unwrap();
+        assert_eq!(learn.events("a").unwrap().len(), 1);
+        learn.consolidate("a").unwrap();
+        assert_eq!(learn.outcomes("a").unwrap().len(), 1);
     }
 
     #[test]
