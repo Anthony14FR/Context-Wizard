@@ -1,6 +1,7 @@
 //! Tests of the plugin's polyglot `SessionStart` launcher in every shell Claude Code may use:
-//! hand-off to the installed binary, first-run download, checksum check, proxy support and
-//! retention of previous versions.
+//! hand-off to the installed binary, first-run download, checksum check, proxy support,
+//! retention of previous versions, and the absence of marks that would make `SmartScreen` or
+//! Gatekeeper block the downloaded binary.
 //!
 //! Shell-form hook commands reach sh and bash unsubstituted, with `CLAUDE_PLUGIN_ROOT` in the
 //! environment, and reach PowerShell with the path substituted, as Claude Code runs them.
@@ -133,6 +134,38 @@ impl Launch<'_> {
             .write_all(PROMPT.as_bytes())
             .unwrap();
         child.wait_with_output().unwrap()
+    }
+}
+
+/// The downloaded binary carries no mark that makes `SmartScreen` or Gatekeeper inspect it, and
+/// on macOS it holds the ad hoc signature that arm64 requires to run.
+fn assert_trusted(binary: &Path) {
+    if cfg!(windows) {
+        let mut stream = binary.as_os_str().to_owned();
+        stream.push(":Zone.Identifier");
+        assert!(
+            std::fs::File::open(PathBuf::from(stream)).is_err(),
+            "{} has a Mark of the Web",
+            binary.display()
+        );
+    }
+    if cfg!(target_os = "macos") {
+        let quarantine = Command::new("xattr")
+            .args(["-p", "com.apple.quarantine"])
+            .arg(binary)
+            .output()
+            .unwrap();
+        assert!(
+            !quarantine.status.success(),
+            "{} is quarantined",
+            binary.display()
+        );
+        let signature = Command::new("codesign")
+            .args(["--verify", "--verbose"])
+            .arg(binary)
+            .output()
+            .unwrap();
+        assert!(signature.status.success(), "{signature:?}");
     }
 }
 
@@ -278,6 +311,7 @@ fn launcher_downloads_verifies_and_runs_the_binary() {
         );
         let current = std::fs::read_to_string(bin.join("current")).unwrap();
         assert_eq!(current.trim(), env!("CARGO_PKG_VERSION"), "{shell:?}");
+        assert_trusted(&bin.join(binary_name()));
         assert_question(&shell, &launch.run(&shell));
         assert_eq!(server.hits.load(Ordering::SeqCst), hits + 1, "{shell:?}");
     }
