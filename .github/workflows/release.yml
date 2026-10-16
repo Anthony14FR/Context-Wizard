@@ -31,8 +31,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: |
+      - env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "invalid version $VERSION"; exit 1; }
+          if [[ "$VERSION" == *-* ]]; then
+            [ "$GITHUB_REF_NAME" = next ] || { echo "prereleases are cut from the next branch, the beta channel"; exit 1; }
+          else
+            [ "$GITHUB_REF_NAME" = "$DEFAULT_BRANCH" ] || { echo "releases are cut from $DEFAULT_BRANCH"; exit 1; }
+          fi
           if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null; then
             echo "tag v$VERSION already exists"; exit 1
           fi
@@ -147,15 +154,18 @@ jobs:
           PY
           git commit -am "chore(release): pin binaries for v$VERSION"
           git log --oneline -3
-      - name: Tag, publish, then update the default branch
+      - name: Tag, publish, then update the release branch
         if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          git fetch --quiet origin "$DEFAULT_BRANCH"
-          [ "$(git rev-parse "origin/$DEFAULT_BRANCH")" = "${{ github.sha }}" ] || { echo "$DEFAULT_BRANCH moved during the release; run it again"; exit 1; }
+          git fetch --quiet origin "$GITHUB_REF_NAME"
+          [ "$(git rev-parse "origin/$GITHUB_REF_NAME")" = "${{ github.sha }}" ] || { echo "$GITHUB_REF_NAME moved during the release; run it again"; exit 1; }
           git tag "v$VERSION"
           git push origin "v$VERSION"
-          gh release create "v$VERSION" dist/* --verify-tag --title "v$VERSION" --notes "See CHANGELOG.md for the changes in this release."
-          git push origin "HEAD:$DEFAULT_BRANCH"
+          channel=()
+          if [[ "$VERSION" == *-* ]]; then
+            channel=(--prerelease)
+          fi
+          gh release create "v$VERSION" dist/* --verify-tag "${channel[@]}" --title "v$VERSION" --notes "See CHANGELOG.md for the changes in this release."
+          git push origin "HEAD:$GITHUB_REF_NAME"
