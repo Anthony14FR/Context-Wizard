@@ -40,6 +40,14 @@ pub(crate) fn run(project: &Path, enabled: bool) -> ExitCode {
         }
         return ExitCode::SUCCESS;
     };
+    if let Err(error) =
+        settings::set_tools_allowed(project, &install::tools_rule(&plugin_id), enabled)
+    {
+        eprintln!(
+            "Context Wizard could not update the allowed tools in {}: {error}",
+            settings::RELATIVE_PATH
+        );
+    }
     match settings::set_plugin_enabled(project, &plugin_id, enabled) {
         Ok(()) if !enabled => println!(
             "Claude Code stops loading Context Wizard in this project from the next session. \

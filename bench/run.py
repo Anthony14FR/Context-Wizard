@@ -28,6 +28,8 @@ from pathlib import Path
 
 EDIT_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
 ALLOWED_TOOLS = "Read,Grep,Glob,Edit,Write,Bash(git diff:*),Bash(git status:*)"
+PLUGIN_TOOLS = "mcp__plugin_context-wizard_context-wizard__*"
+BYTES_PER_TOKEN = 4
 
 
 @dataclass
@@ -62,6 +64,7 @@ class Result:
     output_tokens: int
     tool_calls_before_edit: int
     tool_calls: int
+    exploration_tokens: int
     turns: int
     duration_ms: int
     error: str = ""
@@ -142,7 +145,7 @@ def run_claude(task: Task, checkout: Path, arguments: argparse.Namespace) -> tup
         "--permission-mode",
         "acceptEdits",
         "--allowedTools",
-        ALLOWED_TOOLS,
+        ALLOWED_TOOLS if arguments.mode == "baseline" else f"{ALLOWED_TOOLS},{PLUGIN_TOOLS}",
     ]
     if arguments.mode == "plugin":
         command += ["--plugin-dir", str(Path(arguments.plugin_dir).resolve())]
@@ -183,6 +186,31 @@ def tool_calls(events: list[dict]) -> tuple[int, int]:
     return before_edit, total
 
 
+def exploration_tokens(events: list[dict]) -> int:
+    names: dict[str, str] = {}
+    for event in events:
+        if event.get("type") != "assistant":
+            continue
+        for block in event.get("message", {}).get("content", []):
+            if block.get("type") == "tool_use":
+                names[block.get("id", "")] = block.get("name", "")
+    size = 0
+    for event in events:
+        if event.get("type") != "user":
+            continue
+        content = event.get("message", {}).get("content", [])
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if block.get("type") != "tool_result" or names.get(block.get("tool_use_id", "")) in EDIT_TOOLS:
+                continue
+            body = block.get("content", "")
+            if isinstance(body, list):
+                body = "".join(part.get("text", "") for part in body if isinstance(part, dict))
+            size += len(str(body).encode("utf-8"))
+    return size // BYTES_PER_TOKEN
+
+
 def succeeded(task: Task, answer: str, checkout: Path) -> bool:
     if task.kind == "locate":
         folded = answer.casefold()
@@ -217,6 +245,7 @@ def measure(task: Task, repository: Repository, run: int, arguments: argparse.Na
         output_tokens=usage.get("output_tokens", 0),
         tool_calls_before_edit=before_edit,
         tool_calls=total,
+        exploration_tokens=exploration_tokens(events),
         turns=final.get("num_turns", 0),
         duration_ms=final.get("duration_ms", int((time.monotonic() - start) * 1000)),
         error="" if final else stderr.strip()[:500],
@@ -265,23 +294,27 @@ def main() -> int:
     tasks = [task for task in tasks if not selected or task.id in selected]
     Path(arguments.workdir).mkdir(parents=True, exist_ok=True)
 
-    results: list[Result] = []
-    for task in tasks:
-        for run in range(1, arguments.runs + 1):
-            result = measure(task, repositories[task.repository], run, arguments)
-            results.append(result)
-            status = "ok" if result.success else "failed"
-            print(f"{task.id} run {run}: {status}, {result.context_tokens:,} context tokens, "
-                  f"{result.tool_calls_before_edit} calls before edit", flush=True)
-
     out = Path(arguments.out)
     out.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%dT%H%M%S")
     report = out / f"{stamp}-{arguments.mode}.json"
-    report.write_text(
-        json.dumps([asdict(result) | {"context_tokens": result.context_tokens} for result in results], indent=2) + "\n",
-        encoding="utf-8",
-    )
+    results: list[Result] = []
+    for task in tasks:
+        for run in range(1, arguments.runs + 1):
+            try:
+                result = measure(task, repositories[task.repository], run, arguments)
+            except (subprocess.CalledProcessError, OSError) as error:
+                print(f"{task.id} run {run}: skipped, {error}", flush=True)
+                continue
+            results.append(result)
+            status = "ok" if result.success else "failed"
+            print(f"{task.id} run {run}: {status}, {result.context_tokens:,} context tokens, "
+                  f"{result.exploration_tokens:,} exploration tokens, "
+                  f"{result.tool_calls_before_edit} calls before edit", flush=True)
+            report.write_text(
+                json.dumps([asdict(result) | {"context_tokens": result.context_tokens} for result in results], indent=2) + "\n",
+                encoding="utf-8",
+            )
     (out / f"{stamp}-{arguments.mode}.md").write_text(summary(results), encoding="utf-8")
     print(f"\nWrote {report}")
     print(summary(results))

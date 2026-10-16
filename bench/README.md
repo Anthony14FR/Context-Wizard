@@ -21,7 +21,9 @@ Each repository has seven `locate` tasks, which succeed when the final answer co
 
 - Every run starts from a clean checkout of the pinned commit.
 - The same task runs with the same model in two modes: `baseline`, without the plugin, and `plugin`, with the project enabled and already indexed, which is the steady state of a project in daily use.
-- Token counts are the usage reported by the API for each session: input, cache reads, cache writes and output. They are exact and need no tokenizer.
+- Token counts are the usage reported by the API for each session: input, cache reads, cache writes and output. They are exact and need no tokenizer. Most of them are Claude Code's own system prompt and tool definitions, read again at every turn, which the plugin cannot change.
+- Exploration tokens are the size of what Read, Grep, Glob and the Context Wizard tools returned, at four bytes per token. They are what the plugin aims to reduce.
+- In plugin mode, the Context Wizard MCP tools are allowed like the built-in read-only tools, as the plugin allows them when a project is enabled.
 - Each task runs three times per mode, and the report uses medians.
 - User-level plugins and settings of the machine running the benchmark load in both modes alike.
 

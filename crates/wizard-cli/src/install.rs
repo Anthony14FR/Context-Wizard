@@ -28,6 +28,26 @@ pub(crate) fn plugin_id() -> Option<String> {
     Some(format!("{PLUGIN_NAME}@{marketplace}"))
 }
 
+/// Name of the MCP server the plugin declares in `.mcp.json`.
+pub(crate) const MCP_SERVER: &str = "context-wizard";
+
+/// Permission rule that allows every tool of the plugin's MCP server.
+pub(crate) fn tools_rule(plugin_id: &str) -> String {
+    let plugin = plugin_id.split('@').next().unwrap_or(plugin_id);
+    let clean = |text: &str| -> String {
+        text.chars()
+            .map(|character| {
+                if character.is_ascii_alphanumeric() || character == '_' || character == '-' {
+                    character
+                } else {
+                    '_'
+                }
+            })
+            .collect()
+    };
+    format!("mcp__plugin_{}_{}__*", clean(plugin), clean(MCP_SERVER))
+}
+
 /// Returns `true` when the plugin that launched this binary declares a different version.
 ///
 /// The plugin and the binary are released together, so a mismatch means the plugin was updated
@@ -55,7 +75,15 @@ fn marketplace_from_data_dir(name: &str) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
-    use super::marketplace_from_data_dir;
+    use super::{marketplace_from_data_dir, tools_rule};
+
+    #[test]
+    fn names_the_tools_of_the_plugin_server() {
+        assert_eq!(
+            tools_rule("context-wizard@context-wizard-beta"),
+            "mcp__plugin_context-wizard_context-wizard__*"
+        );
+    }
 
     #[test]
     fn reads_the_marketplace_from_the_data_directory() {
