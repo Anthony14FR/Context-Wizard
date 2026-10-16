@@ -7,59 +7,59 @@ stack = "PowerShell"
 [[task]]
 id = "pester-01"
 kind = "locate"
-prompt = "When Run.Parallel is on, how does Pester decide a test file must run sequentially because of its '#pester:no-parallel' comment? Name the function and its file path."
-answer_contains = ["Test-PesterFileIsNonParallel", "src/functions/Pester.Parallel.ps1"]
+prompt = "Pester can be configured so that a failed expectation does not stop the test immediately: the remaining lines still run and the test is failed at the end with every failure reported. Trace this end to end: where the setting is declared with its default, where a failed check decides to record the failure instead of throwing it, where the error object for a failed check is built, and where the collected errors make the test fail. List the repository-relative paths of the files involved."
+answer_contains = ["src/csharp/Pester/ShouldConfiguration.cs", "src/functions/assertions/Should.ps1", "src/csharp/Pester/Factory.cs", "src/Pester.Runtime.ps1"]
 
 [[task]]
 id = "pester-02"
 kind = "locate"
-prompt = "With Run.Shuffle enabled, which functions pick the shuffled order and detect a '#pester:no-shuffle' opt-out for a container? Give the function names and the file they live in."
-answer_contains = ["Get-ShuffledOrder", "Test-BlockContainerIsNoShuffle", "src/Pester.Runtime.ps1"]
+prompt = "The classic expectation command (the one test code pipes values into) takes its comparison operators as switches, for example the one that checks a collection has an expected number of items. Those switches are not written in the command's param block. Trace how that built-in operator is defined and registered when the module loads, how it becomes a parameter of that command, and how a call using it is dispatched to its test function. List the repository-relative paths of the files involved."
+answer_contains = ["src/functions/assertions/HaveCount.ps1", "src/Main.ps1", "src/functions/assertions/Should.ps1"]
 
 [[task]]
 id = "pester-03"
 kind = "locate"
-prompt = "Where are the attributes of each JUnit <testcase> element written, and which file defines the public Export-JUnitReport command? Give function name and file paths."
-answer_contains = ["Write-JUnitTestCaseAttributes", "src/functions/TestResults.JUnit4.ps1", "src/functions/TestResults.ps1"]
+prompt = "There is an experimental setting that makes a faked command take effect for calls coming from any module or script in the session, not only from the scope where the fake was defined. Trace it from where the setting is declared, through the public command that sets up a fake, to the code that intercepts command name resolution for the whole runspace. List the repository-relative paths of the files involved."
+answer_contains = ["src/csharp/Pester/MockConfiguration.cs", "src/functions/Pester.SessionState.Mock.ps1", "src/functions/Mock.ps1", "src/csharp/Pester/GlobalMockHook.cs"]
 
 [[task]]
 id = "pester-04"
 kind = "locate"
-prompt = "Which function builds the Cobertura coverage XML, and which file picks the report format and calls it? Name the function and the file paths."
-answer_contains = ["Get-CoberturaReportXml", "src/functions/Coverage.Plugin.ps1", "src/functions/Coverage.ps1"]
+prompt = "Calls made to a faked command are remembered separately for each test and each block, so a later check can count how many times it was called, and that record starts empty for every new block and test. Trace where the per-scope storage is created, where it is wired into a run, how the runner triggers that setup before each block and test, and where an intercepted call is appended to it. List the repository-relative paths of the files involved."
+answer_contains = ["src/functions/Pester.SessionState.Mock.ps1", "src/Main.ps1", "src/Pester.Runtime.ps1", "src/functions/Mock.ps1"]
 
 [[task]]
 id = "pester-05"
 kind = "locate"
-prompt = "Add-ShouldOperator rejects an operator whose name or alias is already registered. Which function does that uniqueness check, and in which file is Add-ShouldOperator defined?"
-answer_contains = ["Assert-AssertionOperatorNameIsUnique", "src/Main.ps1"]
+prompt = "When test files run concurrently, each in its own runspace, the console still shows the per-test lines in order, as if the files had run one after another in the same session. Trace how each worker captures the events and host messages it produces, how the calling session splits and replays them, and where the replayed events end up printed. List the repository-relative paths of the files involved."
+answer_contains = ["src/Main.ps1", "src/functions/Pester.Parallel.ps1", "src/Pester.Runtime.ps1", "src/functions/Output.ps1"]
 
 [[task]]
 id = "pester-06"
 kind = "locate"
-prompt = "Which function evaluates a Mock's -ParameterFilter against the bound parameters of a call, and in which file does the Invoke-Mock entry point live?"
-answer_contains = ["Test-ParameterFilter", "src/functions/Mock.ps1", "src/functions/Pester.SessionState.Mock.ps1"]
+prompt = "When test files run concurrently in separate runspaces and Pester is also measuring which lines of the code under test were executed, each worker measures on its own, yet a single report file is produced. Trace how the workers are told to measure and to skip writing their own report, how their per-line hit counts are returned and combined, and where the final report is built from the combined data. List the repository-relative paths of the files involved."
+answer_contains = ["src/Main.ps1", "src/functions/Pester.Parallel.ps1", "src/functions/Coverage.ps1", "src/functions/Coverage.Plugin.ps1"]
 
 [[task]]
 id = "pester-07"
 kind = "locate"
-prompt = "TestDrive cleanup removes symbolic links before deleting files. Which function does that, in which file, and which C# file defines the TestDrive.Enabled configuration option?"
-answer_contains = ["Remove-TestDriveSymbolicLinks", "src/functions/TestDrive.ps1", "src/csharp/Pester/TestDriveConfiguration.cs"]
+prompt = "Pester can save an XML file describing the outcome of every test once the run is over. For the default file format, trace the flow from where the setting that turns it on and picks the format is declared, through where the end-of-run step is registered and executed, to the code that writes the element for each individual test. List the repository-relative paths of the files involved."
+answer_contains = ["src/csharp/Pester/TestResultConfiguration.cs", "src/Main.ps1", "src/functions/TestResults.ps1", "src/functions/TestResults.NUnit25.ps1"]
 
 [[task]]
 id = "pester-08"
 kind = "edit"
-prompt = "In the C# TestDriveConfiguration class, change the description of the Enabled option from 'Enable TestDrive.' to 'Enable TestDrive for the test run.' and leave the default value as is."
-check = "grep -q \"Enable TestDrive for the test run\" src/csharp/Pester/TestDriveConfiguration.cs"
+prompt = "Add a new configuration option TestDrive.RootPath (a string, empty by default, meaning the system temp directory) that lets users choose the directory under which the temporary test drive folders are created, and make the creation of those folders honour it."
+check = "grep -q \"RootPath\" src/csharp/Pester/TestDriveConfiguration.cs && grep -q \"RootPath\" src/functions/TestDrive.ps1"
 
 [[task]]
 id = "pester-09"
 kind = "edit"
-prompt = "Rename the function Test-PesterFileIsNonParallel to Test-PesterFileOptsOutOfParallel, updating its definition, the caller in the Invoke-Pester source and every reference under src and tst."
-check = "grep -q \"function Test-PesterFileOptsOutOfParallel\" src/functions/Pester.Parallel.ps1 && grep -q \"Test-PesterFileOptsOutOfParallel -Path\" src/Main.ps1 && ! grep -rq \"Test-PesterFileIsNonParallel\" src tst"
+prompt = "Add a new public standalone assertion command Should-BeEvenNumber that passes when the actual value is an even integer and otherwise fails with the same kind of assertion failure as the other standalone assertions, and make it exported by the module like the existing ones."
+check = "grep -rqE \"function +Should-BeEvenNumber\" src/functions && grep -q \"Should-BeEvenNumber\" src/Module.ps1 && grep -q \"Should-BeEvenNumber\" src/Pester.psd1"
 
 [[task]]
 id = "pester-10"
 kind = "edit"
-prompt = "Rename Remove-TestDriveSymbolicLinks to Remove-TestDriveSymlinks, updating the definition and all call sites under src and tst."
-check = "grep -q \"function Remove-TestDriveSymlinks\" src/functions/TestDrive.ps1 && ! grep -rq \"Remove-TestDriveSymbolicLinks\" src tst"
+prompt = "Add a new configuration option CodeCoverage.ExcludePath (an array of strings, empty by default) listing files or directories that must be left out of code coverage measurement, and apply it where the files to measure are resolved."
+check = "grep -q \"ExcludePath\" src/csharp/Pester/CodeCoverageConfiguration.cs && grep -qE \"ExcludePath\" src/functions/Coverage.ps1 src/functions/Coverage.Plugin.ps1"

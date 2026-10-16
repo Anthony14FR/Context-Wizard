@@ -7,59 +7,95 @@ stack = "React Native with Expo (TypeScript)"
 [[task]]
 id = "social-app-01"
 kind = "locate"
-prompt = "Which constant sets the maximum post length in graphemes, and which component file draws the composer's character-count progress indicator? Answer concisely with the constant name and file path."
-answer_contains = ["MAX_GRAPHEME_LENGTH", "src/view/com/composer/char-progress/CharProgress.tsx"]
+prompt = "When I tap the heart under a post, the count changes instantly, before the server answers, and if I tap it many times very fast only the final state is sent to the server. I want to understand how this works: the row of buttons under the post, the hook that sends the request, the generic helper that collapses rapid taps into a single request, and the place where the instantly displayed values are kept until the server confirms. List the repository-relative paths of the files involved."
+answer_contains = [
+  "src/components/PostControls/index.tsx",
+  "src/state/queries/post.ts",
+  "src/lib/hooks/useToggleMutationQueue.ts",
+  "src/state/cache/post-shadow.ts",
+]
 
 [[task]]
 id = "social-app-02"
 kind = "locate"
-prompt = "Post likes and reposts are toggled through a queued mutation. Which hook and file implement the like queue, and which generic hook file does it build on? Name the paths concisely."
-answer_contains = ["usePostLikeMutationQueue", "src/lib/hooks/useToggleMutationQueue.ts"]
+prompt = "Words starting with # in a post's text can be tapped. Tapping one opens a small menu: one option opens a dedicated screen listing top and latest posts for that word, another silences the word so posts containing it get hidden for my account. Trace the component that renders the tappable word and its menu, the code that saves the silencing choice to my account on the server, the screen that is opened, and the data query that screen uses to load its posts. List the repository-relative paths of the files involved."
+answer_contains = [
+  "src/components/RichTextTag.tsx",
+  "src/state/queries/preferences/index.ts",
+  "src/screens/Hashtag.tsx",
+  "src/state/queries/search-posts-v2.ts",
+]
 
 [[task]]
 id = "social-app-03"
 kind = "locate"
-prompt = "Where is the zod schema for the app's locally persisted state defined, and which file is the web-specific implementation of persisted storage? Give the file paths."
-answer_contains = ["src/state/persisted/schema.ts", "src/state/persisted/index.web.ts"]
+prompt = "On mobile, the bell tab in the tab strip at the bottom of the screen shows a small number of new activity items. That number refreshes on its own every so often, and goes back to zero once I have looked at my activity list. Trace the tab strip that displays the number, the module that periodically checks the server and stores the count, the helper that fetches a page of items and summarises it, and the screen that tells the server everything has been seen. List the repository-relative paths of the files involved."
+answer_contains = [
+  "src/view/shell/bottom-bar/BottomBar.tsx",
+  "src/state/queries/notifications/unread.tsx",
+  "src/state/queries/notifications/util.ts",
+  "src/screens/Notifications/index.tsx",
+]
 
 [[task]]
 id = "social-app-04"
 kind = "locate"
-prompt = "Which file contains the session reducer and its Action type, and which file wraps that reducer to add logging? Give the paths."
-answer_contains = ["src/state/session/reducer.ts", "src/state/session/logging.ts"]
+prompt = "When I press the button to publish a new post with photos attached, each photo is first shrunk to fit a size limit, then sent to my server as raw file data, and only then is the post record itself written; afterwards the editor waits until the post can be read back before closing. Trace the editor screen that starts this, the function that builds and writes the post record, the code that shrinks each photo, and the code that sends the file data. List the repository-relative paths of the files involved."
+answer_contains = [
+  "src/view/com/composer/Composer.tsx",
+  "src/lib/api/index.ts",
+  "src/lib/media/image/compress.ts",
+  "src/lib/api/upload-blob.ts",
+]
 
 [[task]]
 id = "social-app-05"
 kind = "locate"
-prompt = "Which file defines the FeedTuner class that filters and reshapes feed slices, and which query file for the post feed imports and uses it? Answer with paths."
-answer_contains = ["src/lib/api/feed-manip.ts", "src/state/queries/post-feed.ts"]
+prompt = "In the web version, when I reload the page I stay signed in without typing my password again, and if I sign out in another browser tab this tab follows. Trace the React provider that coordinates restoring the signed-in account, the pure state transition logic it dispatches to, the function that rebuilds an authenticated connection from the saved tokens, and the browser storage layer that saves the account data and notifies other tabs of changes. List the repository-relative paths of the files involved."
+answer_contains = [
+  "src/state/session/index.tsx",
+  "src/state/session/reducer.ts",
+  "src/state/session/session-core.ts",
+  "src/state/persisted/index.web.ts",
+]
 
 [[task]]
 id = "social-app-06"
 kind = "locate"
-prompt = "Where is the URL path pattern for the hashtag route declared, and which file holds the screen component rendered for it? Name the files."
-answer_contains = ["src/routes.ts", "src/screens/Hashtag.tsx"]
+prompt = "On someone's profile I open the three-dots menu and choose to block them. The screen immediately reflects the block before the server confirms, the person's posts are reloaded, and the list of accounts I have blocked in moderation settings is refreshed. Trace the menu component, the hook that writes the block record to the server, the module that holds the instantly displayed per-account overrides, and the query that loads the moderation settings list of accounts I have blocked. List the repository-relative paths of the files involved."
+answer_contains = [
+  "src/view/com/profile/ProfileMenu.tsx",
+  "src/state/queries/profile.ts",
+  "src/state/cache/profile-shadow.ts",
+  "src/state/queries/my-blocked-accounts.ts",
+]
 
 [[task]]
 id = "social-app-07"
 kind = "locate"
-prompt = "Which hook gates actions behind a verified email, and which state file provides the email context it reads? Give the file paths."
-answer_contains = ["src/lib/hooks/useRequireEmailVerification.tsx", "src/state/email-verification.tsx"]
+prompt = "When I tap a web address in a post whose visible text shows one site but which actually points to another site, a confirmation popup appears first. Otherwise, outside sites open either in the system browser or in an embedded browser sheet, depending on a setting I can change, and the first time I am asked which one I prefer. Trace the pressable component that handles the tap, the helper that decides whether the displayed text and the real destination disagree, the confirmation popup, the hook that actually opens the address, and where my embedded browser choice is stored. List the repository-relative paths of the files involved."
+answer_contains = [
+  "src/components/Link.tsx",
+  "src/lib/strings/url-helpers.ts",
+  "src/components/dialogs/LinkWarning.tsx",
+  "src/lib/hooks/useOpenLink.ts",
+  "src/state/preferences/in-app-browser.tsx",
+]
 
 [[task]]
 id = "social-app-08"
 kind = "edit"
-prompt = "Direct messages are limited to 1000 graphemes. Lower that limit to 500 by changing the constant where it is defined."
-check = "grep -q 'MAX_DM_GRAPHEME_LENGTH = 500' src/lib/constants.ts"
+prompt = "Add a device-local setting that hides the number of likes shown in the action row under posts. Store it with the app's other on-device settings under the key hideLikeCounts (off by default), expose it through hooks named useHideLikeCounts and useSetHideLikeCounts following the existing pattern for such settings (including registering its provider), add a toggle for it on the accessibility settings screen, and make the action row under posts hide the like count when it is on."
+check = "grep -q 'hideLikeCounts' src/state/persisted/schema.ts && grep -rq 'useSetHideLikeCounts' src/state/preferences && grep -rq 'useSetHideLikeCounts' src/screens/Settings && grep -rq 'useHideLikeCounts' src/components src/view"
 
 [[task]]
 id = "social-app-09"
 kind = "edit"
-prompt = "The unread notification badge cap is currently 100. Change it to 50 in the constant that defines it."
-check = "grep -q 'UNREAD_NOTIFICATION_CAP = 50' src/lib/constants.ts"
+prompt = "The three-dots menu on a post has an action that copies the post's text to the clipboard, but nothing is recorded for analytics when it is used. Add a new typed analytics event named post:copyText, carrying the post uri and author did, declare it alongside the other typed events, and send it when that copy action is used."
+check = "grep -q 'post:copyText' src/analytics/metrics/types.ts && grep -rq 'post:copyText' src/components"
 
 [[task]]
 id = "social-app-10"
 kind = "edit"
-prompt = "Users can subscribe to at most 20 labelers. Reduce that maximum to 10 in the constant that defines it."
-check = "grep -q 'MAX_LABELERS = 10' src/lib/constants.ts"
+prompt = "Add a new settings page that explains how much storage the app uses on the device. It must be a navigable screen named StorageSettings, reachable on the web at the path /settings/storage, typed like the other settings screens in the navigation parameter types, registered with the app's navigator, and linked from the main settings list."
+check = "grep -q 'StorageSettings' src/routes.ts && grep -q '/settings/storage' src/routes.ts && grep -q 'StorageSettings' src/lib/routes/types.ts && grep -q 'StorageSettings' src/Navigation.tsx && grep -qE 'settings/storage|StorageSettings' src/screens/Settings/Settings.tsx"

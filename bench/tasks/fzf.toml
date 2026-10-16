@@ -7,59 +7,59 @@ stack = "Go"
 [[task]]
 id = "fzf-01"
 kind = "locate"
-prompt = "Where is the fuzzy match scoring implemented, including the bonus constants for word boundaries and consecutive matches? Answer concisely with the file path and the main V2 matching function."
-answer_contains = ["src/algo/algo.go", "FuzzyMatchV2"]
+prompt = "When the user types a character in the prompt, the list of candidates is filtered and re-ranked almost instantly, using several CPU cores. Trace this flow end to end: from the keystroke in the interactive UI, through the main event loop and the parallel scan of the input, down to the code that computes the score of a single candidate line. List the repository-relative paths of the files involved."
+answer_contains = ["src/terminal.go", "src/core.go", "src/matcher.go", "src/pattern.go", "src/algo/algo.go"]
 
 [[task]]
 id = "fzf-02"
 kind = "locate"
-prompt = "Which file implements the HTTP server behind --listen, including the check that requires FZF_API_KEY for non-local addresses? Answer concisely with the file path and the function that starts the server."
-answer_contains = ["src/server.go", "startHttpServer"]
+prompt = "Lines piped into the program on standard input are not processed one at a time: they are ingested in the background, stored in memory in fixed-size blocks, and the main loop is woken up periodically to re-run the search on what has arrived so far. Trace this flow from where the input source is opened to where the main loop reacts to new data. List the repository-relative paths of the files involved."
+answer_contains = ["src/reader.go", "src/chunklist.go", "src/core.go", "src/util/eventbox.go"]
 
 [[task]]
 id = "fzf-03"
 kind = "locate"
-prompt = "Where is the query history file loaded and trimmed to its maximum size, and which function in options.go constructs it when --history is parsed? Give the file paths and symbol names, briefly."
-answer_contains = ["src/history.go", "NewHistory"]
+prompt = "With the flag that tells the program to honor color escape sequences in its input, a colored line can still be searched as plain text, yet it is displayed with its original colors, merged with the highlighting of the matched characters. Trace how the escape codes are stripped and remembered at load time and how they are reapplied when a line is drawn on screen. List the repository-relative paths of the files involved."
+answer_contains = ["src/ansi.go", "src/core.go", "src/result.go", "src/terminal.go"]
 
 [[task]]
 id = "fzf-04"
 kind = "locate"
-prompt = "Which file holds the per-chunk cache that remembers match results for a query so typing another character can reuse them, and what is the cache type called? Answer briefly with path and type name."
-answer_contains = ["src/cache.go", "ChunkCache"]
+prompt = "A running instance can be remote-controlled: another process sends it a request containing a list of actions (for example changing the query or reloading the input), and the open finder applies them. Trace how such a request is received, authenticated, turned into actions and finally executed by the running UI. List the repository-relative paths of the files involved."
+answer_contains = ["src/server.go", "src/options.go", "src/terminal.go"]
 
 [[task]]
 id = "fzf-05"
 kind = "locate"
-prompt = "Where does fzf parse field index expressions such as 2..4 used by --nth and --with-nth? Answer briefly with the file path and the function name."
-answer_contains = ["src/tokenizer.go", "ParseRange"]
+prompt = "Users can restrict searching to some whitespace- or delimiter-separated columns of each line, for example only the second and third fields, with an expression given on the command line. Trace how that column expression is parsed at startup and how it is applied when a line is checked against the query. List the repository-relative paths of the files involved."
+answer_contains = ["src/options.go", "src/tokenizer.go", "src/pattern.go", "src/core.go"]
 
 [[task]]
 id = "fzf-06"
 kind = "locate"
-prompt = "Where is the tiebreak ordering (length, pathname criteria) applied when comparing matched results? Name the file path and the sort type that implements it, concisely."
-answer_contains = ["src/result.go", "ByRelevance"]
+prompt = "Each worker thread scores its own share of the input, yet the user sees one single list ordered best first, with ties between equal scores broken by user-configurable rules such as line length or position of the match. Trace where those tie-breaking rules are read from the command line, where per-line ranking keys are computed and compared, and how the per-worker sorted lists are combined into the final ordering. List the repository-relative paths of the files involved."
+answer_contains = ["src/options.go", "src/result.go", "src/matcher.go", "src/merger.go"]
 
 [[task]]
 id = "fzf-07"
 kind = "locate"
-prompt = "Which shell script defines the bash CTRL-R history search widget, and what is the name of the function it binds? Answer concisely with the path and function name."
-answer_contains = ["shell/key-bindings.bash", "__fzf_history__"]
+prompt = "When asked to open in a floating popup of a terminal multiplexer, the program does not draw itself in the current pane: it re-launches itself inside the popup and relays the piped input, the selected output and the exit status back to the original process. Trace this flow from the startup decision to the code that creates the named pipes used for the relay on Unix. List the repository-relative paths of the files involved."
+answer_contains = ["src/core.go", "src/tmux.go", "src/proxy.go", "src/proxy_unix.go"]
 
 [[task]]
 id = "fzf-08"
 kind = "edit"
-prompt = "Raise the default maximum history size from 1000 to 2000: update defaultHistoryMax in the constants and the --history-size help text in src/options.go so the documented default matches."
-check = "grep -q 'defaultHistoryMax int = 2000' src/constants.go && grep -q '(default: 2000)' src/options.go"
+prompt = "Add a new bindable action named toggle-cycle that turns on or off, at runtime, the behaviour where moving past the last entry of the list wraps around to the first one (and vice versa). It must be accepted in key bindings like any other action and be documented in the manual page alongside the other toggle actions."
+check = "grep -q 'toggle-cycle' src/options.go && grep -qE 'act[A-Za-z]*Cycle' src/terminal.go && grep -qE 'toggle.?-cycle' man/man1/fzf.1"
 
 [[task]]
 id = "fzf-09"
 kind = "edit"
-prompt = "Rename the NewHistory constructor to NewHistoryFile and update every caller, including the call in parseOptions and the tests."
-check = "grep -q 'func NewHistoryFile(' src/history.go && grep -q 'NewHistoryFile(path, historyMax)' src/options.go && grep -q 'NewHistoryFile(' src/history_test.go"
+prompt = "Add a new command-line flag --history-no-dups: when queries are persisted to the query recall file, a query identical to the most recent saved entry must not be appended again. Document the new flag in the built-in usage text and in the manual page."
+check = "grep -q 'history-no-dups' src/options.go && grep -qE 'history.?-no.?-dups' man/man1/fzf.1"
 
 [[task]]
 id = "fzf-10"
 kind = "edit"
-prompt = "Add a new file src/algo/doc.go containing only a package comment starting with '// Package algo' that briefly describes the fuzzy matching algorithms, followed by the package clause."
-check = "test -f src/algo/doc.go && grep -q '^// Package algo' src/algo/doc.go && grep -q '^package algo' src/algo/doc.go"
+prompt = "The shell integration binds the directory-jump widget to ALT-C unconditionally. Let users pick a different key sequence through a new environment variable FZF_ALT_C_KEY, falling back to ALT-C when it is unset, in the bash, zsh and fish integrations."
+check = "grep -q 'FZF_ALT_C_KEY' shell/key-bindings.bash && grep -q 'FZF_ALT_C_KEY' shell/key-bindings.zsh && grep -q 'FZF_ALT_C_KEY' shell/key-bindings.fish"

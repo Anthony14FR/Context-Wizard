@@ -7,59 +7,59 @@ stack = "Java with Spring Boot and Maven"
 [[task]]
 id = "spring-petclinic-01"
 kind = "locate"
-prompt = "Which controller handles the owner search page, and which repository method does it call to find owners by last name? Answer concisely with the file path and method name."
-answer_contains = ["owner/OwnerController.java", "findByLastNameStartingWith"]
+prompt = "Bug report: on the client search screen, typing the start of a surname that matches many people shows a paged list, but clicking page 2 suddenly lists every client instead of only the matching ones. Trace the flow from the search form through the request handling and the data query to the page that renders the paging links. List the repository-relative paths of the files involved."
+answer_contains = ["src/main/resources/templates/owners/findOwners.html", "src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java", "src/main/java/org/springframework/samples/petclinic/owner/OwnerRepository.java", "src/main/resources/templates/owners/ownersList.html"]
 
 [[task]]
 id = "spring-petclinic-02"
 kind = "locate"
-prompt = "The vets list is cached. Which file defines the cache named vets, and which file puts the caching annotation on the lookup methods? Answer concisely with file paths."
-answer_contains = ["system/CacheConfiguration.java", "vet/VetRepository.java"]
+prompt = "Giving an animal the same name as another animal of the same client, even with different letter case, is rejected with an error next to the name field. There is an application-level check and a database-level safety net for concurrent submissions. Trace the check, the case-insensitive name lookup it relies on, the database rule behind the safety net in the default embedded database, and where the displayed error text is defined. List the repository-relative paths of the files involved."
+answer_contains = ["src/main/java/org/springframework/samples/petclinic/owner/PetController.java", "src/main/java/org/springframework/samples/petclinic/owner/Owner.java", "src/main/resources/db/h2/schema.sql", "src/main/resources/messages/messages.properties"]
 
 [[task]]
 id = "spring-petclinic-03"
 kind = "locate"
-prompt = "Where is the 10-digit telephone number rule for owners declared, and in which resource file is its error message text defined? Answer concisely with file paths."
-answer_contains = ["owner/Owner.java", "messages/messages.properties"]
+prompt = "When a client record is created with a contact number that is not exactly ten digits, the form comes back with a localized error under that field. Trace where the rule is declared, which handler triggers it, the form page and the shared markup that prints the error, and where the default error text lives. List the repository-relative paths of the files involved."
+answer_contains = ["src/main/java/org/springframework/samples/petclinic/owner/Owner.java", "src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java", "src/main/resources/templates/owners/createOrUpdateOwnerForm.html", "src/main/resources/templates/fragments/inputField.html", "src/main/resources/messages/messages.properties"]
 
 [[task]]
 id = "spring-petclinic-04"
 kind = "locate"
-prompt = "Which class validates the pet name length and required birth date, and which controller registers it on the form binder? Answer concisely with the class name and file paths."
-answer_contains = ["owner/PetValidator.java", "owner/PetController.java"]
+prompt = "On the screen for adding an animal to a client, a drop-down offers the kinds of animal sorted alphabetically, and the chosen label is turned back into a stored entity when the form is posted. Trace where the choices are loaded and sorted, the page and reusable fragment that render the drop-down, and the component that converts the submitted text back. List the repository-relative paths of the files involved."
+answer_contains = ["src/main/java/org/springframework/samples/petclinic/owner/PetController.java", "src/main/java/org/springframework/samples/petclinic/owner/PetTypeRepository.java", "src/main/java/org/springframework/samples/petclinic/owner/PetTypeFormatter.java", "src/main/resources/templates/pets/createOrUpdatePetForm.html", "src/main/resources/templates/fragments/selectField.html"]
 
 [[task]]
 id = "spring-petclinic-05"
 kind = "locate"
-prompt = "How does the UI language get switched at runtime through a request parameter? Name the file and the interceptor class involved. Answer concisely."
-answer_contains = ["system/WebConfiguration.java", "LocaleChangeInterceptor"]
+prompt = "The clinic staff page shows doctors five at a time with their areas of expertise, or a placeholder word when a doctor has none, and repeated loads do not hit the database because results are kept in memory. Trace the request handler, the data access with its memoization, where that in-memory store is set up, the entity providing the expertise list and count, and the page markup. List the repository-relative paths of the files involved."
+answer_contains = ["src/main/java/org/springframework/samples/petclinic/vet/VetController.java", "src/main/java/org/springframework/samples/petclinic/vet/VetRepository.java", "src/main/java/org/springframework/samples/petclinic/system/CacheConfiguration.java", "src/main/java/org/springframework/samples/petclinic/vet/Vet.java", "src/main/resources/templates/vets/vetList.html"]
 
 [[task]]
 id = "spring-petclinic-06"
 kind = "locate"
-prompt = "Which class converts the pet type text submitted in the pet form into a PetType, and which repository does it query to do so? Answer concisely with the file paths."
-answer_contains = ["owner/PetTypeFormatter.java", "owner/PetTypeRepository.java"]
+prompt = "A visitor can switch the whole interface to Spanish by adding a query parameter to any URL, and the choice sticks for later requests. Trace where the parameter is intercepted and the choice remembered, where the location of the translation bundles is configured, the Spanish bundle, and the shared page layout whose navigation menu texts get translated. List the repository-relative paths of the files involved."
+answer_contains = ["src/main/java/org/springframework/samples/petclinic/system/WebConfiguration.java", "src/main/resources/application.properties", "src/main/resources/messages/messages_es.properties", "src/main/resources/templates/fragments/layout.html"]
 
 [[task]]
 id = "spring-petclinic-07"
 kind = "locate"
-prompt = "Which test checks that all translated messages properties files stay in sync, and which main class registers the messages resources for native image hints? Answer concisely with file paths."
-answer_contains = ["system/I18nPropertiesSyncTest.java", "PetClinicRuntimeHints.java"]
+prompt = "When booking an appointment for an animal, the date picker starts at tomorrow and refuses earlier days, and if an old date is forced through, the form shows an error saying the date must come later. Trace the handler that prepares and checks the booking, the entity that sets the default date, the page and the shared input markup that apply the lower bound, and where the error text is defined. List the repository-relative paths of the files involved."
+answer_contains = ["src/main/java/org/springframework/samples/petclinic/owner/VisitController.java", "src/main/java/org/springframework/samples/petclinic/owner/Visit.java", "src/main/resources/templates/pets/createOrUpdateVisitForm.html", "src/main/resources/templates/fragments/inputField.html", "src/main/resources/messages/messages.properties"]
 
 [[task]]
 id = "spring-petclinic-08"
 kind = "edit"
-prompt = "The owners search results are paginated 5 per page. Change the page size used by the owners list controller to 10."
-check = "grep -q 'int pageSize = 10' src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java"
+prompt = "Clients need an optional email address. Add an email field to the client record, persist it in a database column named email in the default embedded database, and let users enter it on the client create/edit form."
+check = "grep -q 'email' src/main/java/org/springframework/samples/petclinic/owner/Owner.java && grep -qi 'email' src/main/resources/db/h2/schema.sql && grep -q 'email' src/main/resources/templates/owners/createOrUpdateOwnerForm.html"
 
 [[task]]
 id = "spring-petclinic-09"
 kind = "edit"
-prompt = "Raise the maximum pet name length from 30 to 50 in the pet validator, and update the validation error message text so it says 50 characters instead of 30."
-check = "grep -q 'MAX_NAME_LENGTH = 50' src/main/java/org/springframework/samples/petclinic/owner/PetValidator.java && grep -q 'no more than 50 characters' src/main/java/org/springframework/samples/petclinic/owner/PetValidator.java"
+prompt = "Appointment notes are cut at 255 characters. Allow up to 500 characters for an appointment description, both in the application-side validation and in every database schema whose column currently caps it at 255."
+check = "grep -Eq 'max *= *500' src/main/java/org/springframework/samples/petclinic/owner/Visit.java && grep -Eiq 'description +varchar\\(500\\)' src/main/resources/db/h2/schema.sql && grep -Eiq 'description +varchar\\(500\\)' src/main/resources/db/mysql/schema.sql"
 
 [[task]]
 id = "spring-petclinic-10"
 kind = "edit"
-prompt = "Rename the request parameter used to switch the UI language from lang to locale in the web MVC configuration."
-check = "grep -q 'setParamName(\"locale\")' src/main/java/org/springframework/samples/petclinic/system/WebConfiguration.java"
+prompt = "The number of doctors shown per page on the clinic staff page is hard-coded. Make it configurable through the application property petclinic.vets.page-size, declared in the main application configuration with a default value of 5, and read by the code that builds the page."
+check = "grep -Eq '^petclinic\\.vets\\.page-size *[=:]' src/main/resources/application.properties && grep -rEq 'petclinic\\.vets' src/main/java"
