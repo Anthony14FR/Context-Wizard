@@ -12,3 +12,4 @@ Decisions are recorded as described in [ADR 0001](0001-record-architecture-decis
 | [0006](0006-hook-launchers-and-binary-location.md) | Hook launchers and binary location | Accepted |
 | [0007](0007-git-signals-through-the-git-command-line.md) | Git signals through the git command line | Accepted |
 | [0008](0008-hooks-read-the-index-directly.md) | Hooks read the index directly | Accepted |
+| [0009](0009-data-upgrades.md) | Data upgrades | Accepted |

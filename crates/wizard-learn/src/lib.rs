@@ -8,7 +8,8 @@
 //! the words of past tasks are mapped to the files they refer to.
 //!
 //! Unlike the index, this store cannot be rebuilt from the project, so a schema change migrates
-//! it instead of dropping it. A database written by a newer build is left untouched, and a
+//! it instead of dropping it, after copying it to `learn.db.v<old version>.bak`. A database
+//! written by a newer build is left untouched, which keeps a downgrade from losing data, and a
 //! corrupt one is moved aside before a fresh store is created.
 
 use std::error::Error;
@@ -455,6 +456,9 @@ fn try_connect(path: &Path) -> Result<Learn, LearnError> {
         return Err(LearnError::NewerSchema(version));
     }
     if version < SCHEMA_VERSION {
+        if version > 0 {
+            back_up(&connection, path, version)?;
+        }
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let version = schema_version(&transaction)?;
         if version > SCHEMA_VERSION {
@@ -470,6 +474,27 @@ fn try_connect(path: &Path) -> Result<Learn, LearnError> {
         transaction.commit()?;
     }
     Ok(Learn { connection })
+}
+
+/// Path of the copy of the store made before migrating it from schema `version`.
+#[must_use]
+pub fn backup_path(path: &Path, version: i64) -> PathBuf {
+    let mut backup = path.as_os_str().to_owned();
+    backup.push(format!(".v{version}.bak"));
+    PathBuf::from(backup)
+}
+
+fn back_up(connection: &Connection, path: &Path, version: i64) -> Result<(), LearnError> {
+    let backup = backup_path(path, version);
+    if backup.exists() {
+        return Ok(());
+    }
+    let target = backup.to_string_lossy().into_owned();
+    match connection.execute("VACUUM INTO ?1", [&target]) {
+        Ok(_) => Ok(()),
+        Err(_) if backup.exists() => Ok(()),
+        Err(error) => Err(error.into()),
+    }
 }
 
 fn schema_version(connection: &Connection) -> Result<i64, LearnError> {
@@ -500,7 +525,7 @@ mod tests {
 
     use super::{
         Event, EventKind, HALF_LIFE_MS, LEARN_FILE, Learn, LearnError, MIGRATIONS, SCHEMA_VERSION,
-        decay,
+        backup_path, decay,
     };
 
     fn read(session: &str, at: i64, path: &str) -> Event {
@@ -580,6 +605,15 @@ mod tests {
         assert_eq!(learn.events("a").unwrap().len(), 1);
         learn.consolidate("a").unwrap();
         assert_eq!(learn.outcomes("a").unwrap().len(), 1);
+        let backup = rusqlite::Connection::open(backup_path(&path, 1)).unwrap();
+        let version: i64 = backup
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 1);
+        let events: i64 = backup
+            .query_row("SELECT COUNT(*) FROM events", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(events, 1);
     }
 
     #[test]
