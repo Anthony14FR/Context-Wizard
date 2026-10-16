@@ -3,6 +3,7 @@
 mod context;
 mod decide;
 mod event;
+mod grep;
 mod hook;
 mod index;
 mod install;

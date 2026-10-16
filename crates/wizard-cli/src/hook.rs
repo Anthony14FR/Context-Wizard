@@ -13,6 +13,7 @@ use wizard_core::decision::{self, State};
 
 use crate::context;
 use crate::event::{Event, EventName};
+use crate::grep;
 use crate::install;
 use crate::opt_in;
 
@@ -50,6 +51,15 @@ fn respond(event: &Event) -> Option<String> {
         {
             let text = context::refreshed_overview(&project)?;
             Some(additional_context("SessionStart", &text))
+        }
+        State::Decided(decision)
+            if decision.enabled
+                && event.hook_event_name == EventName::PreToolUse
+                && event.tool_name.as_deref() == Some("Grep") =>
+        {
+            let pattern = event.tool_input.as_ref()?.get("pattern")?.as_str()?;
+            let text = grep::known_symbol(&project, pattern)?;
+            Some(additional_context("PreToolUse", &text))
         }
         State::Undecided if event.hook_event_name == EventName::UserPromptSubmit => {
             let binary = env::current_exe().ok()?;

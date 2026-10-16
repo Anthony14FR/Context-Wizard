@@ -229,3 +229,56 @@ fn enabled_projects_get_the_overview_at_session_start() {
     assert!(overview.contains("- src/main.rs"), "{overview}");
     assert!(overview.len() < 10_000);
 }
+
+fn hook_with(project: &Path, input: &str) -> Output {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_wizard"))
+        .arg("hook")
+        .env("CLAUDE_PROJECT_DIR", project)
+        .env_remove("CLAUDE_PLUGIN_ROOT")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+    child.wait_with_output().unwrap()
+}
+
+#[test]
+fn grep_for_a_known_symbol_gets_its_definition() {
+    let project = tempfile::tempdir().unwrap();
+    std::fs::write(
+        project.path().join("billing.py"),
+        "def compute_invoice(total):\n    return total\n",
+    )
+    .unwrap();
+    assert!(decide(project.path(), "on").status.success());
+    let grep = |pattern: &str| {
+        let input = serde_json::json!({
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Grep",
+            "tool_input": { "pattern": pattern }
+        });
+        hook_with(project.path(), &input.to_string())
+    };
+    let output = grep(r"def compute_invoice");
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["hookSpecificOutput"]["hookEventName"], "PreToolUse");
+    let context = value["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .unwrap();
+    assert!(
+        context.contains("- billing.py:1 def compute_invoice(total):"),
+        "{context}"
+    );
+    assert!(
+        value["hookSpecificOutput"]
+            .get("permissionDecision")
+            .is_none()
+    );
+    assert_eq!(String::from_utf8_lossy(&grep("TODO: later").stdout), "");
+}
