@@ -1,0 +1,11 @@
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = [
+    "-C", "target-feature=+crt-static",
+    "-C", "link-arg=/DELAYLOAD:shell32.dll",
+    "-C", "link-arg=/DELAYLOAD:combase.dll",
+    "-C", "link-arg=/DELAYLOAD:crypt32.dll",
+    "-C", "link-arg=/DELAYLOAD:ws2_32.dll",
+    "-C", "link-arg=/DELAYLOAD:userenv.dll",
+    "-C", "link-arg=/DELAYLOAD:advapi32.dll",
+    "-C", "link-arg=delayimp.lib",
+]
