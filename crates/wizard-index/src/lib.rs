@@ -5,4 +5,6 @@ pub mod graph;
 pub mod learned;
 pub mod map;
 pub mod overview;
+pub mod predict;
 pub mod query;
+pub mod structure;

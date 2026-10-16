@@ -22,7 +22,7 @@ mod symbols;
 pub use symbols::{FileRecord, FileSymbols, LocatedSymbol, SymbolKind, SymbolRecord};
 
 /// Version of the index schema. A different version on disk triggers a rebuild.
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 
 /// Directory holding Context Wizard data, relative to the project root.
 pub const DATA_DIRECTORY: &str = ".wizard";
@@ -55,6 +55,10 @@ const SCHEMA: &str = "
     ) STRICT;
     CREATE INDEX symbols_by_path ON symbols (path);
     CREATE INDEX symbols_by_name ON symbols (name);
+    CREATE TABLE cache (
+        name TEXT PRIMARY KEY NOT NULL,
+        value BLOB NOT NULL
+    ) STRICT;
 ";
 
 /// Failure to open or update the index.
@@ -231,6 +235,35 @@ impl Index {
         Ok(hash.and_then(|hash| hash.try_into().ok()))
     }
 
+    /// Returns the cached value `name`, computed from the index and dropped whenever a file
+    /// or its symbols change.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the database cannot be queried.
+    pub fn cached(&self, name: &str) -> Result<Option<Vec<u8>>, StoreError> {
+        Ok(self
+            .connection
+            .query_row("SELECT value FROM cache WHERE name = ?1", [name], |row| {
+                row.get(0)
+            })
+            .optional()?)
+    }
+
+    /// Stores `value` as the cached value `name`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the database cannot be written.
+    pub fn set_cached(&mut self, name: &str, value: &[u8]) -> Result<(), StoreError> {
+        self.connection.execute(
+            "INSERT INTO cache (name, value) VALUES (?1, ?2)
+             ON CONFLICT (name) DO UPDATE SET value = excluded.value",
+            rusqlite::params![name, value],
+        )?;
+        Ok(())
+    }
+
     /// Brings the index in line with `files`, the latest scan of `root`, and reports what changed.
     ///
     /// Files that cannot be read while hashing are left out and reported as removed; the next
@@ -334,6 +367,9 @@ impl Index {
                 delete.execute([path])?;
             }
         }
+        if !updates.is_empty() || !removed.is_empty() {
+            transaction.execute("DELETE FROM cache", [])?;
+        }
         transaction.commit()?;
         Ok(())
     }
@@ -382,7 +418,7 @@ fn try_connect(path: &Path) -> Result<Index, StoreError> {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         if schema_version(&transaction)? != SCHEMA_VERSION {
             transaction
-                .execute_batch("DROP TABLE IF EXISTS symbols; DROP TABLE IF EXISTS files;")?;
+                .execute_batch("DROP TABLE IF EXISTS cache; DROP TABLE IF EXISTS symbols; DROP TABLE IF EXISTS files;")?;
             transaction.execute_batch(SCHEMA)?;
             transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         }

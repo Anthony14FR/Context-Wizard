@@ -125,3 +125,42 @@ fn ignores_symbols_of_files_outside_the_index() {
         .unwrap();
     assert_eq!(index.symbols().unwrap(), []);
 }
+
+#[test]
+fn finds_definitions_by_name_and_drops_the_cache_on_change() {
+    let project = project(&[("src/a.rs", "fn alpha() {}\n")]);
+    let root = project.path();
+    let mut index = refreshed(root);
+    index
+        .store_symbols(&[FileSymbols {
+            path: "src/a.rs".to_owned(),
+            language: Some("rust".to_owned()),
+            symbols: vec![definition("alpha", 1), definition("beta", 4)],
+        }])
+        .unwrap();
+    let named: Vec<String> = index
+        .definitions_named(&["beta", "missing"])
+        .unwrap()
+        .into_iter()
+        .map(|located| located.symbol.name)
+        .collect();
+    assert_eq!(named, ["beta"]);
+
+    index.set_cached("graph", b"one").unwrap();
+    index.set_cached("graph", b"two").unwrap();
+    assert_eq!(index.cached("graph").unwrap().as_deref(), Some(&b"two"[..]));
+    index
+        .refresh(root, &scan(root, &ScanOptions::default()).files)
+        .unwrap();
+    assert!(index.cached("graph").unwrap().is_some());
+    index.store_symbols(&[]).unwrap();
+    assert!(index.cached("graph").unwrap().is_some());
+    index
+        .store_symbols(&[FileSymbols {
+            path: "src/a.rs".to_owned(),
+            language: Some("rust".to_owned()),
+            symbols: vec![definition("alpha", 1)],
+        }])
+        .unwrap();
+    assert_eq!(index.cached("graph").unwrap(), None);
+}

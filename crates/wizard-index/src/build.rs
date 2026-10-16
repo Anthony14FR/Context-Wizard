@@ -13,6 +13,8 @@ use wizard_parse::lexical::{self, Entry, EntryKind};
 use wizard_scan::{ScanOptions, scan};
 use wizard_store::{Changes, FileSymbols, Index, StoreError, SymbolKind, SymbolRecord};
 
+use crate::structure::Structure;
+
 const HEAD_BYTES: usize = 256;
 
 /// Settings of an index build.
@@ -94,6 +96,7 @@ pub fn build(project: &Path, options: &BuildOptions) -> Result<BuildReport, Inde
     let lexical = extracted.len() - tagged;
     let files: Vec<FileSymbols> = extracted.into_iter().map(|(file, _)| file).collect();
     index.store_symbols(&files)?;
+    let _ = Structure::load(&mut index);
     Ok(BuildReport {
         files: report.files.len(),
         changes,

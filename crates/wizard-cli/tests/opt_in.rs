@@ -406,3 +406,43 @@ fn enabled_projects_record_the_session_in_the_learning_store() {
     assert!(outcomes[0].edited);
     assert_eq!(learn.file_signals().unwrap()[0].useful, 1);
 }
+
+#[test]
+fn enabled_projects_get_predicted_files_for_each_prompt() {
+    let project = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(project.path().join("src")).unwrap();
+    std::fs::write(
+        project.path().join("src/billing.py"),
+        "def compute_invoice(total):
+    return round(total, 2)
+",
+    )
+    .unwrap();
+    std::fs::write(
+        project.path().join("src/api.py"),
+        "from billing import compute_invoice
+
+def handler():
+    return compute_invoice(3)
+",
+    )
+    .unwrap();
+    assert!(decide(project.path(), "on").status.success());
+    let output = hook_with(
+        project.path(),
+        r#"{"hook_event_name":"UserPromptSubmit","session_id":"p1","prompt":"the invoice total is rounded wrong"}"#,
+    );
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let context = value["hookSpecificOutput"]["additionalContext"]
+        .as_str()
+        .unwrap();
+    assert!(
+        context.contains("- src/billing.py (lines 1-2)"),
+        "{context}"
+    );
+    let learn = wizard_learn::Learn::open_project(project.path()).unwrap();
+    let predictions = learn.predictions("p1").unwrap();
+    assert_eq!(predictions.len(), 1);
+    assert!(predictions[0].shown);
+    assert_eq!(predictions[0].files[0], "src/billing.py");
+}

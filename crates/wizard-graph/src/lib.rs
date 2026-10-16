@@ -96,6 +96,70 @@ impl Graph {
         self.targets.len()
     }
 
+    /// Encodes the graph in a compact little-endian form that [`Graph::from_bytes`] reads back.
+    #[must_use]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(16 + self.offsets.len() * 8 + self.targets.len() * 12);
+        bytes.extend_from_slice(&(self.nodes() as u64).to_le_bytes());
+        bytes.extend_from_slice(&(self.edges() as u64).to_le_bytes());
+        for offset in &self.offsets {
+            bytes.extend_from_slice(&(*offset as u64).to_le_bytes());
+        }
+        for target in &self.targets {
+            bytes.extend_from_slice(&target.to_le_bytes());
+        }
+        for weight in &self.weights {
+            bytes.extend_from_slice(&weight.to_le_bytes());
+        }
+        bytes
+    }
+
+    /// Decodes a graph written by [`Graph::to_bytes`], or returns `None` when `bytes` is not one.
+    #[must_use]
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        let mut reader = Reader { bytes };
+        let nodes = usize::try_from(reader.u64()?).ok()?;
+        let edges = usize::try_from(reader.u64()?).ok()?;
+        let offsets = (0..=nodes)
+            .map(|_| usize::try_from(reader.u64()?).ok())
+            .collect::<Option<Vec<usize>>>()?;
+        let targets = (0..edges)
+            .map(|_| reader.u32())
+            .collect::<Option<Vec<u32>>>()?;
+        let weights = (0..edges)
+            .map(|_| reader.f64())
+            .collect::<Option<Vec<f64>>>()?;
+        let valid = reader.bytes.is_empty()
+            && offsets.first() == Some(&0)
+            && offsets.last() == Some(&edges)
+            && offsets.windows(2).all(|pair| pair[0] <= pair[1])
+            && targets.iter().all(|target| index(*target) < nodes);
+        if !valid {
+            return None;
+        }
+        let out_weight = (0..nodes)
+            .map(|node| weights[offsets[node]..offsets[node + 1]].iter().sum())
+            .collect();
+        Some(Self {
+            offsets,
+            targets,
+            weights,
+            out_weight,
+        })
+    }
+
+    /// Starts a builder holding every edge of this graph, to extend it with more edges.
+    #[must_use]
+    pub fn to_builder(&self) -> GraphBuilder {
+        let mut builder = GraphBuilder::new(self.nodes());
+        for node in 0..self.nodes() {
+            for (target, weight) in self.neighbours(node) {
+                builder.add_edge(node, target, weight);
+            }
+        }
+        builder
+    }
+
     /// Outgoing edges of `node` as `(target, weight)` pairs, sorted by target.
     pub fn neighbours(&self, node: usize) -> impl Iterator<Item = (usize, f64)> + '_ {
         let range = self
@@ -108,6 +172,30 @@ impl Graph {
             .iter()
             .zip(&self.weights[range])
             .map(|(target, weight)| (index(*target), *weight))
+    }
+}
+
+struct Reader<'a> {
+    bytes: &'a [u8],
+}
+
+impl Reader<'_> {
+    fn take<const N: usize>(&mut self) -> Option<[u8; N]> {
+        let (head, rest) = self.bytes.split_first_chunk::<N>()?;
+        self.bytes = rest;
+        Some(*head)
+    }
+
+    fn u64(&mut self) -> Option<u64> {
+        self.take().map(u64::from_le_bytes)
+    }
+
+    fn u32(&mut self) -> Option<u32> {
+        self.take().map(u32::from_le_bytes)
+    }
+
+    fn f64(&mut self) -> Option<f64> {
+        self.take().map(f64::from_le_bytes)
     }
 }
 
@@ -227,7 +315,25 @@ fn count(nodes: usize) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{GraphBuilder, PageRankOptions, pagerank};
+    use super::{Graph, GraphBuilder, PageRankOptions, pagerank};
+
+    #[test]
+    fn round_trips_through_bytes_and_builders() {
+        let mut builder = GraphBuilder::new(4);
+        builder.add_edge(0, 1, 1.5);
+        builder.add_edge(1, 2, 0.25);
+        builder.add_edge(3, 0, 2.0);
+        let graph = builder.build();
+        let bytes = graph.to_bytes();
+        assert_eq!(Graph::from_bytes(&bytes), Some(graph.clone()));
+        assert_eq!(Graph::from_bytes(&bytes[..bytes.len() - 1]), None);
+        assert_eq!(Graph::from_bytes(b"garbage"), None);
+        let mut extended = graph.to_builder();
+        extended.add_edge(2, 3, 1.0);
+        let extended = extended.build();
+        assert_eq!(extended.edges(), 4);
+        assert_eq!(extended.neighbours(0).collect::<Vec<_>>(), [(1, 1.5)]);
+    }
 
     #[test]
     fn merges_parallel_edges_and_drops_invalid_ones() {

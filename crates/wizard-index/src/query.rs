@@ -12,6 +12,8 @@ use wizard_store::{Index, LocatedSymbol, StoreError, SymbolKind};
 
 use crate::graph::FileGraph;
 use crate::learned::Learned;
+use crate::map::{TEST_PENALTY, is_test_path};
+use crate::structure::lift;
 
 const MAX_MATCHES: usize = 20;
 const MAX_FILES: usize = 15;
@@ -210,7 +212,9 @@ pub fn impact(
 /// definitions.
 ///
 /// Files whose symbols or path contain the task's keywords seed a personalised `PageRank` over
-/// the file graph, so central files close to those matches rank high as well.
+/// the file graph, so files close to those matches rank high as well. Files rank by lift over
+/// their global rank, so hubs do not crowd out the task, and tests rank after production code
+/// unless the task is about tests.
 ///
 /// # Errors
 ///
@@ -227,39 +231,15 @@ pub fn slice(
     }
     let symbols = index.symbols()?;
     let graph = FileGraph::new(&symbols, history, learned);
-    let mut seeds: BTreeMap<usize, f64> = BTreeMap::new();
-    let mut matches: BTreeMap<usize, Vec<&LocatedSymbol>> = BTreeMap::new();
-    for located in &symbols {
-        let Some(node) = graph.position(&located.path) else {
-            continue;
-        };
-        if located.symbol.kind != SymbolKind::Reference
-            && keywords
-                .iter()
-                .any(|keyword| located.symbol.name.to_lowercase().contains(keyword))
-        {
-            *seeds.entry(node).or_default() += 1.0;
-            matches.entry(node).or_default().push(located);
-        }
-    }
-    for (node, path) in graph.paths.iter().enumerate() {
-        let lower = path.to_lowercase();
-        let hits = keywords
-            .iter()
-            .filter(|keyword| lower.contains(keyword.as_str()))
-            .count();
-        if hits > 0 {
-            *seeds.entry(node).or_default() +=
-                2.0 * f64::from(u32::try_from(hits).unwrap_or(u32::MAX));
-        }
-    }
+    let (seeds, matches) = keyword_seeds(&graph.paths, &symbols, &keywords);
     if seeds.is_empty() {
         return Ok(format!(
             "Nothing in the index matches {}. Try other words, or `find_symbol` with a name.\n",
             keywords.join(", ")
         ));
     }
-    let ranks = graph.rank(&seeds);
+    let mut ranks = lift(&graph.rank(&seeds), &graph.rank(&BTreeMap::new()));
+    penalise_tests(&graph.paths, &mut ranks, &keywords);
     let mut order: Vec<usize> = (0..graph.paths.len()).collect();
     order.sort_by(|left, right| {
         ranks[*right]
@@ -277,6 +257,69 @@ pub fn slice(
         }
     }
     Ok(text)
+}
+
+/// Divides the score of test files by the test penalty, unless the task is about tests.
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "the penalty is a small constant"
+)]
+pub(crate) fn penalise_tests(paths: &[String], scores: &mut [f64], keywords: &[String]) {
+    let about_tests = keywords
+        .iter()
+        .any(|keyword| keyword.starts_with("test") || keyword.starts_with("spec"));
+    if about_tests {
+        return;
+    }
+    for (path, score) in paths.iter().zip(scores.iter_mut()) {
+        if is_test_path(path) {
+            *score /= TEST_PENALTY as f64;
+        }
+    }
+}
+
+/// Seeds of a personalised ranking for `keywords`: files defining a matching symbol, with those
+/// symbols, and files whose path contains a keyword, which weigh twice as much.
+pub(crate) fn keyword_seeds<'a>(
+    paths: &[String],
+    symbols: &'a [LocatedSymbol],
+    keywords: &[String],
+) -> (
+    BTreeMap<usize, f64>,
+    BTreeMap<usize, Vec<&'a LocatedSymbol>>,
+) {
+    let mut seeds: BTreeMap<usize, f64> = BTreeMap::new();
+    let mut matches: BTreeMap<usize, Vec<&LocatedSymbol>> = BTreeMap::new();
+    let position = |path: &str| {
+        paths
+            .binary_search_by(|known| known.as_str().cmp(path))
+            .ok()
+    };
+    for located in symbols {
+        let Some(node) = position(&located.path) else {
+            continue;
+        };
+        if located.symbol.kind != SymbolKind::Reference
+            && keywords
+                .iter()
+                .any(|keyword| located.symbol.name.to_lowercase().contains(keyword))
+        {
+            *seeds.entry(node).or_default() += 1.0;
+            matches.entry(node).or_default().push(located);
+        }
+    }
+    for (node, path) in paths.iter().enumerate() {
+        let lower = path.to_lowercase();
+        let hits = keywords
+            .iter()
+            .filter(|keyword| lower.contains(keyword.as_str()))
+            .count();
+        if hits > 0 {
+            *seeds.entry(node).or_default() +=
+                2.0 * f64::from(u32::try_from(hits).unwrap_or(u32::MAX));
+        }
+    }
+    (seeds, matches)
 }
 
 fn list_files(text: &mut String, title: &str, graph: &FileGraph, nodes: &BTreeSet<usize>) {

@@ -10,6 +10,7 @@ mod install;
 mod learn;
 mod map;
 mod opt_in;
+mod prediction;
 mod serve;
 mod status;
 mod update;

@@ -21,10 +21,12 @@ use rusqlite::{Connection, ErrorCode, OptionalExtension, Row, TransactionBehavio
 use wizard_store::{StoreError, data_directory};
 
 mod glossary;
+mod predictions;
 mod signals;
 mod tasks;
 
 pub use glossary::{GLOSSARY_MIN_SESSIONS, GlossaryEntry};
+pub use predictions::StoredPrediction;
 pub use signals::{
     CO_ACCESS_MAX_FILES, CoAccess, FileSignal, Gap, Outcome, PIVOT_SESSIONS, consolidate_events,
 };
@@ -34,12 +36,12 @@ pub use tasks::{SIMILAR_SESSIONS, SimilarSession, TaskFile, bm25};
 pub const LEARN_FILE: &str = "learn.db";
 
 /// Version of the learning store schema written by this build.
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 
 const OPEN_ATTEMPTS: u32 = 50;
 const OPEN_BACKOFF: Duration = Duration::from_millis(20);
 
-const MIGRATIONS: [&str; 2] = [
+const MIGRATIONS: [&str; 3] = [
     "
     CREATE TABLE sessions (
         id TEXT PRIMARY KEY NOT NULL,
@@ -78,6 +80,18 @@ const MIGRATIONS: [&str; 2] = [
         at INTEGER NOT NULL,
         PRIMARY KEY (session, pattern)
     ) STRICT;
+",
+    "
+    CREATE TABLE predictions (
+        id INTEGER PRIMARY KEY,
+        session TEXT NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+        at INTEGER NOT NULL,
+        files TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        alpha REAL NOT NULL,
+        shown INTEGER NOT NULL
+    ) STRICT;
+    CREATE INDEX predictions_by_session ON predictions (session, id);
 ",
 ];
 
