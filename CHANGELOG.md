@@ -2,6 +2,17 @@
 
 All notable changes to Context Wizard are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-10-16
+
+### Changed
+
+- Prediction confidence comes from the BM25 score of the best file per word of the task the project knows. On 1,232 tasks mined from the history of the benchmark repositories, predictions are shown for 28% of prompts, and then the first file is right 45% of the time. Long descriptive prompts no longer inflate confidence.
+- Predictions show three files instead of five.
+
+### Added
+
+- `bench/mine_history.py` turns the git history of the benchmark repositories into locate tasks graded offline.
+
 ## [0.3.0] - 2026-10-16
 
 ### Added
@@ -69,6 +80,7 @@ First public release.
 - `wizard calibrate` measures token ratios with Anthropic's `count_tokens` endpoint, on request only.
 - Property-based fuzzing of every parser of untrusted input, and a threat model.
 
+[0.4.0]: https://github.com/Anthony14FR/Context-Wizard/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Anthony14FR/Context-Wizard/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Anthony14FR/Context-Wizard/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Anthony14FR/Context-Wizard/releases/tag/v0.1.0
