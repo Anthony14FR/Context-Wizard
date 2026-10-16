@@ -17,5 +17,9 @@
     "tokens",
     "tree-sitter",
     "learning"
-  ]
+  ],
+  "icon": "./icon.png",
+  "documentationUrl": "https://github.com/Anthony14FR/Context-Wizard#readme",
+  "supportUrl": "https://github.com/Anthony14FR/Context-Wizard/issues",
+  "privacyPolicyUrl": "https://github.com/Anthony14FR/Context-Wizard/blob/main/docs/privacy.md"
 }
