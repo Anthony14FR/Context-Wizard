@@ -12,6 +12,7 @@ mod map;
 mod opt_in;
 mod prediction;
 mod serve;
+mod stats;
 mod status;
 mod update;
 
@@ -62,6 +63,12 @@ enum Command {
         #[arg(long)]
         project: Option<PathBuf>,
     },
+    /// Shows what Context Wizard learned about a project and how well it predicts.
+    Stats {
+        /// Project root. Defaults to the current directory.
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+    },
     /// Shows whether Context Wizard is enabled for a project and whether its binary is healthy.
     Status {
         /// Project root. Defaults to the current directory.
@@ -91,6 +98,7 @@ fn main() -> ExitCode {
         Some(Command::Index { project }) => index::run(&project),
         Some(Command::Map { level, project }) => map::run(&project, level),
         Some(Command::Serve { project }) => serve::run(project),
+        Some(Command::Stats { project }) => stats::run(&project),
         Some(Command::Status { project }) => status::run(&project),
         Some(Command::UpdateCheck) => update::check(),
         None => ExitCode::SUCCESS,
