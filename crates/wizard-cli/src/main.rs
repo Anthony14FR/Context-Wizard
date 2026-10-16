@@ -85,6 +85,18 @@ enum Command {
         #[arg(long, default_value = ".")]
         project: PathBuf,
     },
+    /// Prints the files predicted for a prompt as JSON, without recording anything.
+    #[command(hide = true)]
+    Predict {
+        /// The prompt to predict files for.
+        prompt: String,
+        /// Ignore what past sessions taught.
+        #[arg(long)]
+        no_learning: bool,
+        /// Project root. Defaults to the current directory.
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+    },
     /// Lists the framework recipes of a project and checks them, failing on a broken recipe.
     Recipes {
         /// Project root. Defaults to the current directory.
@@ -128,6 +140,11 @@ fn main() -> ExitCode {
         Some(Command::Map { level, project }) => map::run(&project, level),
         Some(Command::Serve { project }) => serve::run(project),
         Some(Command::Purge { all, project }) => purge::run(&project, all),
+        Some(Command::Predict {
+            prompt,
+            no_learning,
+            project,
+        }) => prediction::run(&project, &prompt, !no_learning),
         Some(Command::Recipes { project }) => recipes::run(&project),
         Some(Command::Stats { project }) => stats::run(&project),
         Some(Command::Status { project }) => status::run(&project),

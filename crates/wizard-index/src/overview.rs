@@ -106,6 +106,12 @@ pub fn overview(project: &Path, index: &Index) -> Result<String, StoreError> {
     sections.push(entry_points(&files));
     sections.push(commands(project, &projects));
     sections.push(folders(&files));
+    sections.push(vec![
+        "Context Wizard tools, cheaper than searching and reading whole files:".to_owned(),
+        "- `find_symbol` and `refs`: where a name is defined and used, with lines, instead of Grep.".to_owned(),
+        "- `explain`: the outline of a file without reading it; then read only the lines you need.".to_owned(),
+        "- `slice`: the files most relevant to a task; `impact`: what a change to a file affects.".to_owned(),
+    ]);
     Ok(fit(&sections, L0_BUDGET, &calibration::estimator(project)))
 }
 

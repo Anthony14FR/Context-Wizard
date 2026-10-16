@@ -28,6 +28,45 @@ pub fn terms(text: &str) -> Vec<String> {
     terms
 }
 
+/// The meaningful words of `text` reduced to a common stem, in order and with repetitions, so
+/// that `tracks`, `tracked` and `track` match.
+#[must_use]
+pub fn stems(text: &str) -> Vec<String> {
+    terms(text).iter().map(|term| stem(term)).collect()
+}
+
+/// A light stem of a lowercase word: plural and verb endings, then a final `e`, are removed.
+#[must_use]
+pub fn stem(word: &str) -> String {
+    let length = word.chars().count();
+    let cut = |suffix: &str, replacement: &str| -> Option<String> {
+        word.strip_suffix(suffix)
+            .map(|base| format!("{base}{replacement}"))
+    };
+    let stemmed = if length > 4 && word.ends_with("ies") {
+        cut("ies", "y")
+    } else if length > 4
+        && ["sses", "ches", "shes", "xes"]
+            .iter()
+            .any(|end| word.ends_with(end))
+    {
+        cut("es", "")
+    } else if length > 3 && word.ends_with('s') && !word.ends_with("ss") && !word.ends_with("us") {
+        cut("s", "")
+    } else if length > 5 && word.ends_with("ing") {
+        cut("ing", "")
+    } else if length > 4 && word.ends_with("ed") {
+        cut("ed", "")
+    } else {
+        None
+    };
+    let stemmed = stemmed.unwrap_or_else(|| word.to_owned());
+    match stemmed.strip_suffix('e') {
+        Some(base) if base.chars().count() > 3 => base.to_owned(),
+        _ => stemmed,
+    }
+}
+
 /// The distinct meaningful words of `text`, sorted.
 #[must_use]
 pub fn keywords(text: &str) -> Vec<String> {
@@ -57,7 +96,23 @@ fn split_identifier(word: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{keywords, terms};
+    use super::{keywords, stem, stems, terms};
+
+    #[test]
+    fn stems_join_forms_of_a_word() {
+        assert_eq!(stem("tracks"), "track");
+        assert_eq!(stem("playlists"), "playlist");
+        assert_eq!(stem("libraries"), "library");
+        assert_eq!(stem("matches"), "match");
+        assert_eq!(stem("deleted"), "delet");
+        assert_eq!(stem("deleting"), "delet");
+        assert_eq!(stem("class"), "class");
+        assert_eq!(stem("status"), "status");
+        assert_eq!(
+            stems("DeleteSongFiles"),
+            ["deletesongfil", "delet", "song", "file"]
+        );
+    }
 
     #[test]
     fn keywords_split_identifiers_and_drop_noise() {

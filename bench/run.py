@@ -117,7 +117,10 @@ def prepare_checkout(repository: Repository, workdir: Path) -> Path:
     return checkout
 
 
-def enable_plugin(checkout: Path, wizard: Path) -> None:
+def enable_plugin(checkout: Path, wizard: Path, learning: str) -> None:
+    if learning == "cold":
+        for learned in (checkout / ".wizard").glob("learn.db*"):
+            learned.unlink()
     subprocess.run(
         [str(wizard), "decide", "on", "--project", str(checkout)],
         check=True,
@@ -222,7 +225,7 @@ def succeeded(task: Task, answer: str, checkout: Path) -> bool:
 def measure(task: Task, repository: Repository, run: int, arguments: argparse.Namespace) -> Result:
     checkout = prepare_checkout(repository, Path(arguments.workdir))
     if arguments.mode == "plugin":
-        enable_plugin(checkout, Path(arguments.wizard))
+        enable_plugin(checkout, Path(arguments.wizard), arguments.learning)
     start = time.monotonic()
     try:
         events, stderr = run_claude(task, checkout, arguments)
@@ -285,6 +288,12 @@ def main() -> int:
     parser.add_argument("--claude", default="claude")
     parser.add_argument("--plugin-dir", default="plugin")
     parser.add_argument("--wizard", default="", help="wizard binary used to enable and index projects in plugin mode")
+    parser.add_argument(
+        "--learning",
+        choices=["cold", "warm"],
+        default="cold",
+        help="cold forgets what earlier sessions taught before each one; warm keeps learning across them",
+    )
     arguments = parser.parse_args()
     if arguments.mode == "plugin" and not arguments.wizard:
         parser.error("--wizard is required in plugin mode")
@@ -297,7 +306,8 @@ def main() -> int:
     out = Path(arguments.out)
     out.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%dT%H%M%S")
-    report = out / f"{stamp}-{arguments.mode}.json"
+    suffix = arguments.mode if arguments.mode == "baseline" else f"plugin-{arguments.learning}"
+    report = out / f"{stamp}-{suffix}.json"
     results: list[Result] = []
     for task in tasks:
         for run in range(1, arguments.runs + 1):
@@ -315,7 +325,7 @@ def main() -> int:
                 json.dumps([asdict(result) | {"context_tokens": result.context_tokens} for result in results], indent=2) + "\n",
                 encoding="utf-8",
             )
-    (out / f"{stamp}-{arguments.mode}.md").write_text(summary(results), encoding="utf-8")
+    (out / f"{stamp}-{suffix}.md").write_text(summary(results), encoding="utf-8")
     print(f"\nWrote {report}")
     print(summary(results))
     return 0
