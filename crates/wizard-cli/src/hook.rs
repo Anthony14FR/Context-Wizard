@@ -15,6 +15,7 @@ use crate::context;
 use crate::event::{Event, EventName};
 use crate::grep;
 use crate::install;
+use crate::learn;
 use crate::opt_in;
 use crate::update;
 
@@ -46,7 +47,11 @@ fn respond(event: &Event) -> Option<String> {
         return None;
     }
     let project = project_dir(event)?;
-    match decision::load(&project).ok()? {
+    let state = decision::load(&project).ok()?;
+    if matches!(&state, State::Decided(decision) if decision.enabled) {
+        learn::record(&project, event);
+    }
+    match state {
         State::Decided(decision)
             if decision.enabled && event.hook_event_name == EventName::SessionStart =>
         {

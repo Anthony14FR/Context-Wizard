@@ -2203,6 +2203,7 @@ dependencies = [
  "ureq",
  "wizard-core",
  "wizard-index",
+ "wizard-learn",
  "wizard-mcp",
  "wizard-store",
 ]
@@ -2244,6 +2245,15 @@ dependencies = [
  "wizard-graph",
  "wizard-parse",
  "wizard-scan",
+ "wizard-store",
+]
+
+[[package]]
+name = "wizard-learn"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "tempfile",
  "wizard-store",
 ]
 

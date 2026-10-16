@@ -350,3 +350,55 @@ fn session_start_announces_a_newer_release_unless_updates_are_off() {
         assert!(output.get("systemMessage").is_none(), "{variable}");
     }
 }
+
+#[test]
+fn enabled_projects_record_the_session_in_the_learning_store() {
+    let project = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(project.path().join("src")).unwrap();
+    let file = project.path().join("src/auth.rs");
+    std::fs::write(&file, "fn login() {}\n").unwrap();
+    let file = serde_json::to_string(file.to_str().unwrap()).unwrap();
+    let events = [
+        r#"{"hook_event_name":"UserPromptSubmit","session_id":"s1","prompt":"fix the login bug"}"#
+            .to_owned(),
+        format!(
+            r#"{{"hook_event_name":"PostToolUse","session_id":"s1","tool_name":"Read","tool_input":{{"file_path":{file}}}}}"#
+        ),
+        format!(
+            r#"{{"hook_event_name":"PostToolUse","session_id":"s1","tool_name":"Edit","tool_input":{{"file_path":{file},"old_string":"a","new_string":"b"}}}}"#
+        ),
+        r#"{"hook_event_name":"Stop","session_id":"s1"}"#.to_owned(),
+    ];
+    for event in &events {
+        assert!(hook_with(project.path(), event).status.success());
+    }
+    assert!(!project.path().join(".wizard/learn.db").exists());
+
+    assert!(decide(project.path(), "on").status.success());
+    for event in &events {
+        assert!(hook_with(project.path(), event).status.success());
+    }
+    let learn = wizard_learn::Learn::open_project(project.path()).unwrap();
+    let recorded: Vec<(wizard_learn::EventKind, Option<String>)> = learn
+        .events("s1")
+        .unwrap()
+        .into_iter()
+        .map(|event| (event.kind, event.path))
+        .collect();
+    assert_eq!(
+        recorded,
+        [
+            (wizard_learn::EventKind::Prompt, None),
+            (
+                wizard_learn::EventKind::Read,
+                Some("src/auth.rs".to_owned())
+            ),
+            (
+                wizard_learn::EventKind::Edit,
+                Some("src/auth.rs".to_owned())
+            ),
+            (wizard_learn::EventKind::Stop, None),
+        ]
+    );
+    assert!(learn.session("s1").unwrap().unwrap().ended.is_some());
+}

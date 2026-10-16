@@ -98,6 +98,28 @@ impl From<rusqlite::Error> for StoreError {
     }
 }
 
+/// Returns the `.wizard` directory of `project`, creating it when missing.
+///
+/// Callers check the project's opt-in decision first. The directory gets a `.gitignore` that
+/// ignores everything, so its data is never committed even when the project does not ignore it.
+///
+/// # Errors
+///
+/// Returns an error when the directory or its `.gitignore` cannot be created.
+pub fn data_directory(project: &Path) -> Result<PathBuf, StoreError> {
+    let directory = project.join(DATA_DIRECTORY);
+    let io_error = |source| StoreError::Io {
+        path: directory.clone(),
+        source,
+    };
+    fs::create_dir_all(&directory).map_err(io_error)?;
+    let gitignore = directory.join(".gitignore");
+    if !gitignore.exists() {
+        fs::write(&gitignore, "*\n").map_err(io_error)?;
+    }
+    Ok(directory)
+}
+
 /// Files that differ between the index and the latest scan.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Changes {
@@ -150,17 +172,7 @@ impl Index {
     ///
     /// Returns an error when the directory cannot be created or the database cannot be opened.
     pub fn open_project(project: &Path) -> Result<Self, StoreError> {
-        let directory = project.join(DATA_DIRECTORY);
-        let io_error = |source| StoreError::Io {
-            path: directory.clone(),
-            source,
-        };
-        fs::create_dir_all(&directory).map_err(io_error)?;
-        let gitignore = directory.join(".gitignore");
-        if !gitignore.exists() {
-            fs::write(&gitignore, "*\n").map_err(io_error)?;
-        }
-        Self::open(&directory.join(INDEX_FILE))
+        Self::open(&data_directory(project)?.join(INDEX_FILE))
     }
 
     /// Opens the index stored at `path`, rebuilding it when its schema version differs or when
