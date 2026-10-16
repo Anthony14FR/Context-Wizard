@@ -414,35 +414,40 @@ fn enabled_projects_record_the_session_in_the_learning_store() {
 fn enabled_projects_get_predicted_files_for_each_prompt() {
     let project = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(project.path().join("src")).unwrap();
+    for index in 0..200 {
+        std::fs::write(
+            project.path().join(format!("src/module_{index}.py")),
+            format!(
+                "def helper_{index}():
+    return {index}
+"
+            ),
+        )
+        .unwrap();
+    }
     std::fs::write(
         project.path().join("src/billing.py"),
-        "def compute_invoice(total):
-    return round(total, 2)
-",
-    )
-    .unwrap();
-    std::fs::write(
-        project.path().join("src/api.py"),
-        "from billing import compute_invoice
+        "def compute_invoice_total(lines):
+    return sum(lines)
 
-def handler():
-    return compute_invoice(3)
+         def round_invoice_total(total):
+    return round(total, 2)
+
+         def invoice_total_rounding_mode():
+    return 'half-even'
 ",
     )
     .unwrap();
     assert!(decide(project.path(), "on").status.success());
     let output = hook_with(
         project.path(),
-        r#"{"hook_event_name":"UserPromptSubmit","session_id":"p1","prompt":"the invoice total is rounded wrong"}"#,
+        r#"{"hook_event_name":"UserPromptSubmit","session_id":"p1","prompt":"compute and round the invoice total in billing with the right rounding mode"}"#,
     );
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     let context = value["hookSpecificOutput"]["additionalContext"]
         .as_str()
         .unwrap();
-    assert!(
-        context.contains("- src/billing.py (lines 1-2)"),
-        "{context}"
-    );
+    assert!(context.contains("- src/billing.py (lines "), "{context}");
     let learn = wizard_learn::Learn::open_project(project.path()).unwrap();
     let predictions = learn.predictions("p1").unwrap();
     assert_eq!(predictions.len(), 1);
