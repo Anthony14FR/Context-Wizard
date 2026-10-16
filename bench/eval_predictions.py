@@ -1,4 +1,4 @@
-"""Measure the files Context Wizard predicts for the benchmark's locate tasks, with no Claude session.
+"""Measure the files Context Wizard predicts for locate tasks, with no Claude session.
 
 Each locate task lists the files of its answer, so the prediction for its prompt can be graded
 directly: recall@5 is the share of those files among the five predicted ones.
@@ -28,6 +28,21 @@ def predict(wizard: str, checkout: Path, prompt: str, learning: bool) -> dict:
     return json.loads(completed.stdout)
 
 
+def load_tasks(arguments: argparse.Namespace) -> list[tuple[str, list[dict]]]:
+    if arguments.history:
+        return [
+            (path.stem, json.loads(path.read_text(encoding="utf-8")))
+            for path in sorted(Path(arguments.history).glob("*.json"))
+        ]
+    loaded = []
+    for path in sorted(Path(arguments.corpus).glob("*.toml")):
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        loaded.append(
+            (data["repository"]["name"], [task for task in data["task"] if task["kind"] == "locate"])
+        )
+    return loaded
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--wizard", required=True)
@@ -36,15 +51,16 @@ def main() -> int:
     parser.add_argument("--tasks", default="")
     parser.add_argument("--learning", action="store_true", help="use what past sessions taught")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--history", default="", help="folder of tasks mined by mine_history.py, graded instead of the corpus")
     arguments = parser.parse_args()
     selected = {task.strip() for task in arguments.tasks.split(",") if task.strip()}
 
     rows = []
-    for path in sorted(Path(arguments.corpus).glob("*.toml")):
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
-        checkout = Path(arguments.workdir) / data["repository"]["name"]
-        for task in data["task"]:
-            if task["kind"] != "locate" or (selected and task["id"] not in selected):
+    for name, tasks in load_tasks(arguments):
+        checkout = Path(arguments.workdir) / name
+        data = {"repository": {"name": name}}
+        for task in tasks:
+            if selected and task["id"] not in selected:
                 continue
             prediction = predict(arguments.wizard, checkout, task["prompt"], arguments.learning)
             predicted = [file["path"] for file in prediction["files"]]
