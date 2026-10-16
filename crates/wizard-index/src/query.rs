@@ -227,32 +227,7 @@ pub fn slice(
     }
     let symbols = index.symbols()?;
     let graph = FileGraph::new(&symbols, history, learned);
-    let mut seeds: BTreeMap<usize, f64> = BTreeMap::new();
-    let mut matches: BTreeMap<usize, Vec<&LocatedSymbol>> = BTreeMap::new();
-    for located in &symbols {
-        let Some(node) = graph.position(&located.path) else {
-            continue;
-        };
-        if located.symbol.kind != SymbolKind::Reference
-            && keywords
-                .iter()
-                .any(|keyword| located.symbol.name.to_lowercase().contains(keyword))
-        {
-            *seeds.entry(node).or_default() += 1.0;
-            matches.entry(node).or_default().push(located);
-        }
-    }
-    for (node, path) in graph.paths.iter().enumerate() {
-        let lower = path.to_lowercase();
-        let hits = keywords
-            .iter()
-            .filter(|keyword| lower.contains(keyword.as_str()))
-            .count();
-        if hits > 0 {
-            *seeds.entry(node).or_default() +=
-                2.0 * f64::from(u32::try_from(hits).unwrap_or(u32::MAX));
-        }
-    }
+    let (seeds, matches) = keyword_seeds(&graph, &symbols, &keywords);
     if seeds.is_empty() {
         return Ok(format!(
             "Nothing in the index matches {}. Try other words, or `find_symbol` with a name.\n",
@@ -277,6 +252,45 @@ pub fn slice(
         }
     }
     Ok(text)
+}
+
+/// Seeds of a personalised ranking for `keywords`: files defining a matching symbol, with those
+/// symbols, and files whose path contains a keyword, which weigh twice as much.
+pub(crate) fn keyword_seeds<'a>(
+    graph: &FileGraph,
+    symbols: &'a [LocatedSymbol],
+    keywords: &[String],
+) -> (
+    BTreeMap<usize, f64>,
+    BTreeMap<usize, Vec<&'a LocatedSymbol>>,
+) {
+    let mut seeds: BTreeMap<usize, f64> = BTreeMap::new();
+    let mut matches: BTreeMap<usize, Vec<&LocatedSymbol>> = BTreeMap::new();
+    for located in symbols {
+        let Some(node) = graph.position(&located.path) else {
+            continue;
+        };
+        if located.symbol.kind != SymbolKind::Reference
+            && keywords
+                .iter()
+                .any(|keyword| located.symbol.name.to_lowercase().contains(keyword))
+        {
+            *seeds.entry(node).or_default() += 1.0;
+            matches.entry(node).or_default().push(located);
+        }
+    }
+    for (node, path) in graph.paths.iter().enumerate() {
+        let lower = path.to_lowercase();
+        let hits = keywords
+            .iter()
+            .filter(|keyword| lower.contains(keyword.as_str()))
+            .count();
+        if hits > 0 {
+            *seeds.entry(node).or_default() +=
+                2.0 * f64::from(u32::try_from(hits).unwrap_or(u32::MAX));
+        }
+    }
+    (seeds, matches)
 }
 
 fn list_files(text: &mut String, title: &str, graph: &FileGraph, nodes: &BTreeSet<usize>) {
