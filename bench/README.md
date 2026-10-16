@@ -29,6 +29,7 @@ Each repository has seven `locate` tasks and three `edit` tasks, written to need
 - In plugin mode, the Context Wizard MCP tools are allowed like the built-in read-only tools, as the plugin allows them when a project is enabled.
 - Plugin mode runs `cold` by default: what earlier sessions taught is forgotten before each session, so every task measures the plugin on its own. `--learning warm` keeps learning across sessions, as in daily use, where later sessions benefit from earlier ones.
 - `python bench/eval_predictions.py --wizard <binary>` grades the files predicted for each locate task against its expected files, with no Claude session, to tune predictions before a campaign.
+- `python bench/mine_history.py` turns the git history of each repository into locate tasks: the message of a commit is the prompt, and the source files it changed, still present at the pinned commit, are the answer. On the six repositories it yields about 1,200 tasks, which `eval_predictions.py --history .bench-work/history` grades in under two minutes. Commit messages reuse the project's own words more than the frozen tasks do, so the two sets measure different situations.
 - Each task runs three times per mode, and the report uses medians.
 - User-level plugins and settings of the machine running the benchmark load in both modes alike.
 
