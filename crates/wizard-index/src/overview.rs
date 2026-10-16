@@ -14,7 +14,7 @@ use wizard_scan::FileEntry;
 use wizard_scan::projects::{Ecosystem, Project, detect_projects};
 use wizard_store::{FileRecord, Index, StoreError};
 
-use crate::recipes;
+use crate::{calibration, recipes};
 
 /// Hard cap of the overview, in estimated tokens.
 pub const L0_BUDGET: u64 = 800;
@@ -106,11 +106,10 @@ pub fn overview(project: &Path, index: &Index) -> Result<String, StoreError> {
     sections.push(entry_points(&files));
     sections.push(commands(project, &projects));
     sections.push(folders(&files));
-    Ok(fit(&sections, L0_BUDGET))
+    Ok(fit(&sections, L0_BUDGET, &calibration::estimator(project)))
 }
 
-fn fit(sections: &[Vec<String>], budget: u64) -> String {
-    let estimator = Estimator::default();
+fn fit(sections: &[Vec<String>], budget: u64, estimator: &Estimator) -> String {
     let mut text = String::new();
     for section in sections.iter().filter(|section| !section.is_empty()) {
         for (position, line) in section.iter().enumerate() {

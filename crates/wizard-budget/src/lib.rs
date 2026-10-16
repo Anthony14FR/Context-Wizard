@@ -57,7 +57,35 @@ impl Ratios {
         }
     }
 
-    fn for_content(&self, content: Content) -> f64 {
+    /// Writes the ratios as `code=`, `prose=` and `data=` lines, which [`Ratios::parse`] reads.
+    #[must_use]
+    pub fn to_text(&self) -> String {
+        format!(
+            "code={}\nprose={}\ndata={}\n",
+            self.code, self.prose, self.data
+        )
+    }
+
+    /// Reads ratios written by [`Ratios::to_text`], or `None` when one is missing or invalid.
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        let value = |key: &str| {
+            text.lines()
+                .filter_map(|line| line.split_once('='))
+                .find(|(name, _)| name.trim() == key)
+                .and_then(|(_, value)| value.trim().parse::<f64>().ok())
+                .filter(|ratio| ratio.is_finite() && *ratio > 0.0)
+        };
+        Some(Self {
+            code: value("code")?,
+            prose: value("prose")?,
+            data: value("data")?,
+        })
+    }
+
+    /// Ratio for `content`.
+    #[must_use]
+    pub fn for_content(&self, content: Content) -> f64 {
         match content {
             Content::Code => self.code,
             Content::Prose => self.prose,
@@ -153,6 +181,18 @@ fn to_u64(value: f64) -> u64 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn ratios_round_trip_through_text() {
+        let ratios = Ratios {
+            code: 3.25,
+            prose: 4.0,
+            data: 2.5,
+        };
+        assert_eq!(Ratios::parse(&ratios.to_text()), Some(ratios));
+        assert_eq!(Ratios::parse("code=3\nprose=x\ndata=2\n"), None);
+        assert_eq!(Ratios::parse("code=3\nprose=-1\ndata=2\n"), None);
+    }
+
     use super::{Content, Estimator, ModelFamily, Ratios, content_of_language};
 
     #[test]

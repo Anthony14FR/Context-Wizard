@@ -2232,6 +2232,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "ureq",
+ "wizard-budget",
  "wizard-core",
  "wizard-index",
  "wizard-learn",

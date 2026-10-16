@@ -1,5 +1,6 @@
 //! The `wizard` binary: hook commands and the MCP server of Context Wizard.
 
+mod calibrate;
 mod context;
 mod decide;
 mod event;
@@ -36,6 +37,16 @@ struct Cli {
 enum Command {
     /// Handles one Claude Code hook event read from standard input.
     Hook,
+    /// Measures the token ratios of a project with Anthropic's free `count_tokens` endpoint,
+    /// using the key in `ANTHROPIC_API_KEY`.
+    Calibrate {
+        /// Model whose tokenizer to measure.
+        #[arg(long, default_value = "claude-sonnet-5-5")]
+        model: String,
+        /// Project root. Defaults to the current directory.
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+    },
     /// Enables or disables Context Wizard for a project.
     Decide {
         /// The decision to record.
@@ -109,6 +120,7 @@ enum Answer {
 fn main() -> ExitCode {
     match Cli::parse().command {
         Some(Command::Hook) => hook::run(),
+        Some(Command::Calibrate { model, project }) => calibrate::run(&project, &model),
         Some(Command::Decide { answer, project }) => {
             decide::run(&project, matches!(answer, Answer::On))
         }
