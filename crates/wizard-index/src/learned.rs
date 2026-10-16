@@ -5,11 +5,8 @@
 
 use std::path::Path;
 
-use wizard_learn::{LEARN_FILE, Learn};
+use wizard_learn::{LEARN_FILE, Learn, decay};
 use wizard_store::DATA_DIRECTORY;
-
-/// Time after which learned evidence counts half, in milliseconds.
-pub const HALF_LIFE_MS: f64 = 30.0 * 24.0 * 60.0 * 60.0 * 1000.0;
 
 /// Two files touched in the same sessions.
 #[derive(Debug, Clone, PartialEq)]
@@ -75,36 +72,13 @@ impl Learned {
     }
 }
 
-/// Weight left to evidence `age` milliseconds old.
-#[must_use]
-#[allow(
-    clippy::cast_precision_loss,
-    reason = "ages stay far below 2^52 milliseconds"
-)]
-pub fn decay(age: i64) -> f64 {
-    0.5_f64.powf(age.max(0) as f64 / HALF_LIFE_MS)
-}
-
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
 
     use wizard_learn::{Event, EventKind, Learn};
 
-    use super::{HALF_LIFE_MS, Learned, decay};
-
-    #[test]
-    fn evidence_halves_every_thirty_days() {
-        assert!((decay(0) - 1.0).abs() < 1e-12);
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "the half-life is an integer"
-        )]
-        let half_life = HALF_LIFE_MS as i64;
-        assert!((decay(half_life) - 0.5).abs() < 1e-12);
-        assert!((decay(2 * half_life) - 0.25).abs() < 1e-12);
-        assert!((decay(-5) - 1.0).abs() < 1e-12);
-    }
+    use super::Learned;
 
     #[test]
     fn loads_co_access_pairs_from_the_store() {

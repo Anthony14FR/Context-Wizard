@@ -4,7 +4,7 @@
 //! the files read, the searches and their result counts, the files edited, and the end of each
 //! answer. Events are linked by session and kept in `.wizard/learn.db`. Each `Stop`
 //! consolidates its session into per-file outcomes and map gaps, from which the learning
-//! signals are read.
+//! signals are read, and past prompts are matched against a new task to predict its files.
 //!
 //! Unlike the index, this store cannot be rebuilt from the project, so a schema change migrates
 //! it instead of dropping it. A database written by a newer build is left untouched, and a
@@ -20,10 +20,12 @@ use rusqlite::{Connection, ErrorCode, OptionalExtension, Row, TransactionBehavio
 use wizard_store::{StoreError, data_directory};
 
 mod signals;
+mod tasks;
 
 pub use signals::{
     CO_ACCESS_MAX_FILES, CoAccess, FileSignal, Gap, Outcome, PIVOT_SESSIONS, consolidate_events,
 };
+pub use tasks::{SIMILAR_SESSIONS, SimilarSession, TaskFile, bm25};
 
 /// File name of the learning store inside the `.wizard` directory.
 pub const LEARN_FILE: &str = "learn.db";
@@ -340,6 +342,19 @@ impl Learn {
     }
 }
 
+/// Time after which learned evidence counts half, in milliseconds.
+pub const HALF_LIFE_MS: f64 = 30.0 * 24.0 * 60.0 * 60.0 * 1000.0;
+
+/// Weight left to evidence `age` milliseconds old, halving every 30 days.
+#[must_use]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "ages stay far below 2^52 milliseconds"
+)]
+pub fn decay(age: i64) -> f64 {
+    0.5_f64.powf(age.max(0) as f64 / HALF_LIFE_MS)
+}
+
 /// Current time in milliseconds since the Unix epoch.
 #[must_use]
 pub fn now() -> i64 {
@@ -449,7 +464,10 @@ fn set_aside(path: &Path) {
 mod tests {
     #![allow(clippy::unwrap_used)]
 
-    use super::{Event, EventKind, LEARN_FILE, Learn, LearnError, MIGRATIONS, SCHEMA_VERSION};
+    use super::{
+        Event, EventKind, HALF_LIFE_MS, LEARN_FILE, Learn, LearnError, MIGRATIONS, SCHEMA_VERSION,
+        decay,
+    };
 
     fn read(session: &str, at: i64, path: &str) -> Event {
         Event {
@@ -458,6 +476,19 @@ mod tests {
             end_line: Some(40),
             ..Event::new(session, at, EventKind::Read)
         }
+    }
+
+    #[test]
+    fn evidence_halves_every_thirty_days() {
+        assert!((decay(0) - 1.0).abs() < 1e-12);
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "the half-life is an integer"
+        )]
+        let half_life = HALF_LIFE_MS as i64;
+        assert!((decay(half_life) - 0.5).abs() < 1e-12);
+        assert!((decay(2 * half_life) - 0.25).abs() < 1e-12);
+        assert!((decay(-5) - 1.0).abs() < 1e-12);
     }
 
     #[test]
