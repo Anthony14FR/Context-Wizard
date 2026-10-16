@@ -7,59 +7,59 @@ stack = "Laravel (PHP) with a Vue front end"
 [[task]]
 id = "koel-01"
 kind = "locate"
-prompt = "After a media scan finishes, records for files that no longer exist get removed. Which listener does that and where is it wired to the scan-completed event? Answer concisely with file paths."
-answer_contains = ["app/Listeners/DeleteNonExistingRecordsPostScan.php", "app/Providers/EventServiceProvider.php"]
+prompt = "A playlist owner sends someone a link. When that person opens it while logged in, they become a contributor to the playlist, and shortly afterwards every track in that playlist that only its uploader could see becomes visible to all users. Trace this from the front-end screen that handles the link down to the code that changes the tracks' visibility in the database. List the repository-relative paths of the files involved."
+answer_contains = ["resources/assets/js/components/screens/AcceptPlaylistCollaborationInvite.vue", "app/Services/Playlist/PlaylistCollaborationService.php", "app/Listeners/MakePlaylistSongsPublic.php", "app/Services/Playlist/PlaylistService.php"]
 
 [[task]]
 id = "koel-02"
 kind = "locate"
-prompt = "Where are the signed song play URLs generated, and which middleware validates that signature on the audio request? Give the file paths."
-answer_contains = ["app/Services/Streamer/AudioUrlSigner.php", "app/Http/Middleware/AuthenticateAudioRequests.php"]
+prompt = "From a podcast's context menu a user can stop following the show. If they were the last person following it, the show and its episodes are removed from the server entirely, in the background. Trace this from the front-end state code that sends the request, through the HTTP handler and the back-end logic, to the code that decides whether to remove the show. List the repository-relative paths of the files involved."
+answer_contains = ["resources/assets/js/stores/podcastStore.ts", "app/Http/Controllers/API/Podcast/UnsubscribeFromPodcastController.php", "app/Services/Podcast/PodcastService.php", "app/Listeners/DeletePodcastIfNoSubscribers.php"]
 
 [[task]]
 id = "koel-03"
 kind = "locate"
-prompt = "Which classes pick the transcoding strategy and the streaming adapter depending on a song's storage type? Name the file paths."
-answer_contains = ["app/Services/Transcoding/TranscodeStrategyFactory.php", "app/Services/Streamer/Streamer.php"]
+prompt = "Each track shows how many times the current user has listened to it. That number only goes up once a quarter of the track has elapsed in the player, and the time it was last heard is updated at the same moment. Trace this from the player code that checks the elapsed time, through the front-end call and the HTTP handler, to the code that increments the counter in the database. List the repository-relative paths of the files involved."
+answer_contains = ["resources/assets/js/services/QueuePlaybackService.ts", "resources/assets/js/stores/playableStore.ts", "app/Http/Controllers/API/RegisterPlayController.php", "app/Services/InteractionService.php"]
 
 [[task]]
 id = "koel-04"
 kind = "locate"
-prompt = "When playback starts, what listener pushes the now-playing update to Last.fm and ListenBrainz, and which service fans it out to the connected scrobblers? Give class names."
-answer_contains = ["UpdateNowPlaying", "ScrobbleService"]
+prompt = "When a user clicks the heart icon on a single track, the mark is saved, and if the user has linked their account on the external music-tracking site, the same mark is mirrored on that site by a background worker. Trace the back-end path from the HTTP handler to the code that calls the external site. List the repository-relative paths of the files involved."
+answer_contains = ["app/Http/Controllers/API/FavoriteController.php", "app/Services/FavoriteService.php", "app/Listeners/LoveTrackOnLastfm.php", "app/Services/Integrations/LastfmService.php"]
 
 [[task]]
 id = "koel-05"
 kind = "locate"
-prompt = "In the library scanner, where is the choice between parallel and sequential scanning made based on the number of jobs, and which class runs the parallel workers? Give file paths."
-answer_contains = ["app/Services/Scanners/DirectoryScanner.php", "app/Services/Scanners/Strategies/ParallelScanStrategy.php"]
+prompt = "When a user types a new contact address on their own profile page and saves, the address does not switch right away when mail sending is set up: a link is mailed to the new inbox, the old address is warned, and the address only switches when the link is opened. Only the most recent link works, and it is refused if the account address changed meanwhile. Trace this on the back end, from saving the profile to opening the link. List the repository-relative paths of the files involved."
+answer_contains = ["app/Http/Controllers/API/ProfileController.php", "app/Services/UserService.php", "app/Services/EmailChangeService.php", "app/Http/Controllers/API/ConfirmEmailChangeController.php"]
 
 [[task]]
 id = "koel-06"
 kind = "locate"
-prompt = "On the front end, which service caches signed URLs and reuses them until they are close to expiry? And which API controller returns the signed play URL for a song?"
-answer_contains = ["resources/assets/js/services/signedUrlService.ts", "FetchSongPlayUrlController"]
+prompt = "Every few seconds while something is playing, the app records which track is current and how far into it the user is, so that reopening the app later picks up at the same spot. For podcast episodes the position is also remembered per episode. Trace this from the player code to the database writes. List the repository-relative paths of the files involved."
+answer_contains = ["resources/assets/js/services/QueuePlaybackService.ts", "app/Http/Controllers/API/UpdatePlaybackStatusController.php", "app/Services/QueueService.php", "app/Models/QueueState.php", "app/Services/Podcast/PodcastService.php"]
 
 [[task]]
 id = "koel-07"
 kind = "locate"
-prompt = "Where is it enforced that a smart playlist rule with a between operator has exactly two values? Name the class and the operator method involved."
-answer_contains = ["SmartPlaylistRule", "takesTwoValues"]
+prompt = "An administrator selects several tracks and removes them from the library. The database rows go away immediately, the audio files are then removed from storage by a background worker (optionally kept as a backup), and a few seconds later albums and artists left without any track also disappear. Trace the back-end path from the HTTP handler to the code that removes the files and the code that cleans up the empty albums and artists. List the repository-relative paths of the files involved."
+answer_contains = ["app/Http/Controllers/API/SongController.php", "app/Services/SongService.php", "app/Jobs/DeleteSongFilesJob.php", "app/Listeners/PruneLibrary.php", "app/Services/LibraryManager.php"]
 
 [[task]]
 id = "koel-08"
 kind = "edit"
-prompt = "In the audio URL signer, add a private constant MIN_URL_VALID_SECONDS with the value 60 next to the existing EXTRA_VALID_SECONDS constant."
-check = "grep -q 'MIN_URL_VALID_SECONDS' app/Services/Streamer/AudioUrlSigner.php"
+prompt = "Add a new per-user boolean preference with the key confirm_before_clearing_queue, defaulting to true. It must be stored and validated on the server like the other user preferences, and known to the front end with the same default and type."
+check = "grep -rqE 'ConfirmBeforeClearingQueue|confirm_before_clearing_queue' app && grep -q 'confirm_before_clearing_queue' resources/assets/js/stores/preferenceStore.ts && grep -q 'confirm_before_clearing_queue' resources/assets/js/types.d.ts"
 
 [[task]]
 id = "koel-09"
 kind = "edit"
-prompt = "Reduce the front-end signed URL reuse margin so cached URLs are only reused while more than 5 minutes remain, instead of 10 minutes."
-check = "grep -qF 'REUSE_MARGIN_SECONDS = 5 * 60' resources/assets/js/services/signedUrlService.ts"
+prompt = "The link mailed to confirm a change of a user's address currently expires after a fixed 24 hours. Make this lifetime configurable through a new environment variable KOEL_EMAIL_CHANGE_LINK_LIFETIME_HOURS, defaulting to 24, read through the application's own configuration file and documented in the example environment file."
+check = "grep -q 'KOEL_EMAIL_CHANGE_LINK_LIFETIME_HOURS' config/koel.php && grep -q 'KOEL_EMAIL_CHANGE_LINK_LIFETIME_HOURS' .env.example && grep -qE 'config[(]|Config::' app/Services/EmailChangeService.php"
 
 [[task]]
 id = "koel-10"
 kind = "edit"
-prompt = "In ScrobbleService::scrobble, add a guard that returns early without scrobbling when the timestamp is zero or negative."
-check = "grep -q 'timestamp <= 0' app/Services/ScrobbleService.php"
+prompt = "Smart playlist rules on text fields support 'begins with' but have no negative counterpart. Add a 'does not begin with' operator whose stored value is notBeginWith: it must be accepted and applied when the server builds the playlist query, and offered in the rule editor for text fields."
+check = "grep -q \"'notBeginWith'\" app/Enums/SmartPlaylistOperator.php && grep -qiE 'not_?begins?_?with' app/Values/SmartPlaylist/SmartPlaylistQueryModifier.php && grep -q 'notBeginWith' resources/assets/js/config/smart-playlist/operators.ts"

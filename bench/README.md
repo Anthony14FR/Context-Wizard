@@ -15,7 +15,10 @@ Six public repositories of different technologies, each pinned to a commit, with
 | [spring-projects/spring-petclinic](https://github.com/spring-projects/spring-petclinic) | Java with Spring Boot and Maven |
 | [pester/Pester](https://github.com/pester/Pester) | PowerShell |
 
-Each repository has seven `locate` tasks, which succeed when the final answer contains the expected paths or symbols, and three `edit` tasks, which succeed when a check command exits with status 0 after the session.
+Each repository has seven `locate` tasks and three `edit` tasks, written to need real exploration:
+
+- A `locate` task describes a behaviour, a flow or a symptom in plain words, without naming any identifier or file of its answer, and asks for the files involved. It succeeds when the final answer contains every expected path, three to five files per task, each read and confirmed to take part in the flow.
+- An `edit` task describes a change by its behaviour, without naming the files to touch, and needs edits in at least two of them. It succeeds when its check command exits with status 0 after the session. Every check fails on the pristine checkout.
 
 ## Method
 
