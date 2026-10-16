@@ -13,6 +13,7 @@ name = "wizard"
 path = "src/main.rs"
 
 [dependencies]
+wizard-budget.workspace = true
 wizard-core.workspace = true
 wizard-index.workspace = true
 wizard-learn.workspace = true

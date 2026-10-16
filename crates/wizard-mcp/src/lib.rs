@@ -24,9 +24,10 @@ use serde::Deserialize;
 use wizard_core::decision;
 use wizard_git::{History, HistoryOptions};
 use wizard_index::build::{BuildOptions, build};
+use wizard_index::calibration;
 use wizard_index::exact;
 use wizard_index::learned::Learned;
-use wizard_index::map::{L1_BUDGET, map};
+use wizard_index::map::{L1_BUDGET, map_with};
 use wizard_index::overview::overview;
 use wizard_index::query;
 use wizard_store::{Index, StoreError};
@@ -128,8 +129,10 @@ impl WizardServer {
         description = "Map of the most used definitions with signatures and line numbers, grouped by file. Use it to find where the important code lives before reading files."
     )]
     async fn map(&self) -> String {
-        self.answer(false, |_, index, _, _| map(index, L1_BUDGET))
-            .await
+        self.answer(false, |project, index, _, _| {
+            map_with(index, L1_BUDGET, &calibration::estimator(project))
+        })
+        .await
     }
 
     #[tool(

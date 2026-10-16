@@ -34,8 +34,17 @@ struct RankedFile<'a> {
 ///
 /// Returns an error when the index cannot be read.
 pub fn map(index: &Index, budget: u64) -> Result<String, StoreError> {
+    map_with(index, budget, &Estimator::default())
+}
+
+/// Renders the map like [`map`], estimating tokens with `estimator`.
+///
+/// # Errors
+///
+/// Returns an error when the index cannot be read.
+pub fn map_with(index: &Index, budget: u64, estimator: &Estimator) -> Result<String, StoreError> {
     let symbols = index.symbols()?;
-    Ok(render(&rank(&symbols), budget))
+    Ok(render(&rank(&symbols), budget, estimator))
 }
 
 fn rank(symbols: &[LocatedSymbol]) -> Vec<RankedFile<'_>> {
@@ -102,8 +111,7 @@ fn rank(symbols: &[LocatedSymbol]) -> Vec<RankedFile<'_>> {
     ranked
 }
 
-fn render(files: &[RankedFile<'_>], budget: u64) -> String {
-    let estimator = Estimator::default();
+fn render(files: &[RankedFile<'_>], budget: u64, estimator: &Estimator) -> String {
     let mut text = HEADER.to_owned();
     if estimator.estimate(&text, Content::Code) > budget {
         return String::new();
@@ -157,7 +165,7 @@ fn describe(symbol: &SymbolRecord) -> String {
 mod tests {
     use wizard_store::{LocatedSymbol, SymbolKind, SymbolRecord};
 
-    use super::{rank, render};
+    use super::{Estimator, rank, render};
 
     fn symbol(path: &str, kind: SymbolKind, name: &str, line: u32) -> LocatedSymbol {
         LocatedSymbol {
@@ -201,7 +209,7 @@ mod tests {
     #[test]
     fn renders_signatures_in_line_order() {
         let symbols = sample();
-        let text = render(&rank(&symbols), 4_000);
+        let text = render(&rank(&symbols), 4_000, &Estimator::default());
         assert!(
             text.contains("\nsrc/core.rs\n    3 fn parse()\n   10 fn helper()\n"),
             "{text}"
@@ -249,9 +257,8 @@ mod tests {
                 ));
             }
         }
-        let text = render(&rank(&symbols), 500);
-        let estimate =
-            wizard_budget::Estimator::default().estimate(&text, wizard_budget::Content::Code);
+        let text = render(&rank(&symbols), 500, &Estimator::default());
+        let estimate = Estimator::default().estimate(&text, wizard_budget::Content::Code);
         assert!(estimate <= 500, "{estimate}");
         assert!(text.contains("src/module_000.rs"));
     }
