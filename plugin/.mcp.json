@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "context-wizard": {
+      "command": "${CLAUDE_PLUGIN_DATA}/bin/wizard",
+      "args": ["serve"]
+    }
+  }
+}

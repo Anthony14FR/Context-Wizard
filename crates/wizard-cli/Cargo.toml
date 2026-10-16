@@ -15,10 +15,12 @@ path = "src/main.rs"
 [dependencies]
 wizard-core.workspace = true
 wizard-index.workspace = true
+wizard-mcp.workspace = true
 wizard-store.workspace = true
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 sha2.workspace = true
