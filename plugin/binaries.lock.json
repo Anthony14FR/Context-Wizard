@@ -1,12 +1,12 @@
 {
-  "version": "0.2.0",
-  "url": "https://github.com/Anthony14FR/Context-Wizard/releases/download/v0.2.0",
+  "version": "0.3.0",
+  "url": "https://github.com/Anthony14FR/Context-Wizard/releases/download/v0.3.0",
   "sha256": {
-    "aarch64-apple-darwin": "e759b8c493e65496b6db56ea2b12570314bb0adaf8de6ef0a01edd848534fa0d",
-    "aarch64-pc-windows-msvc": "fb3a1768c1c02556a3c762c4c6d507c9752e0a2f3aa7456be5f0754185666b1a",
-    "aarch64-unknown-linux-musl": "692401f99cc7d8d7895c4acfa42bfae883317a9b9af2745389cde9327180d7b8",
-    "x86_64-apple-darwin": "68dfa031da456f5f14e93e666d198bd22e5ae4c1eb8cb5dbd7fa2de9a98fd71f",
-    "x86_64-pc-windows-msvc": "be1eae0f7b77261bc84fc71eed9f90d0a722dcf3c9d953deb06ffb1dff3f9f9f",
-    "x86_64-unknown-linux-musl": "fc7f74d0d7c70de1aa35932aa3fc17263b6eb53b01719ba32ed75ab41316a71d"
+    "aarch64-apple-darwin": "d95507be68ef891208e8bd5d65d6e2f1f1e0c4dc09d68934ef0eada4179cf3ba",
+    "aarch64-pc-windows-msvc": "329ecf2cab013072f98bb1f36d3009d6dade6c6a5b3a78bf651d0fd63ead1868",
+    "aarch64-unknown-linux-musl": "6b36049b678532f881642427c1548c7f46592330a118708aeda3409f2b32bfbc",
+    "x86_64-apple-darwin": "2850962f49dd6f51d02a050f68b22c556828c2ac73ef06feee9c2a908c0d7be8",
+    "x86_64-pc-windows-msvc": "d1dff410b7be530bda1294091e886b5185ab80e083fcc9fc27a92ef419735214",
+    "x86_64-unknown-linux-musl": "758e8583b5c916aa760003fd26a97427e17f39a182651cdc372b17dd58aad515"
   }
 }
