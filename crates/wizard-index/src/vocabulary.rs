@@ -187,6 +187,18 @@ impl Vocabulary {
         (known > 0.0).then(|| held / known)
     }
 
+    /// Number of distinct stemmed words of `query` that some file holds.
+    #[must_use]
+    pub fn known_words(&self, query: &str) -> usize {
+        let mut words = stems(query);
+        words.sort_unstable();
+        words.dedup();
+        words
+            .iter()
+            .filter(|word| self.terms.binary_search(word).is_ok())
+            .count()
+    }
+
     /// Whether `name` shares a stemmed word with `query`.
     #[must_use]
     pub fn relates(name: &str, query: &[String]) -> bool {

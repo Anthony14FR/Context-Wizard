@@ -115,6 +115,12 @@ pub(crate) fn run(project: &Path, prompt: &str, learning: bool) -> std::process:
             "confidence": prediction.confidence,
             "shown": prediction.is_confident(),
             "alpha": options.alpha,
+            "evidence": {
+                "coverage": prediction.evidence.coverage,
+                "top_score": prediction.evidence.top_score,
+                "margin": prediction.evidence.margin,
+                "known_words": prediction.evidence.known_words,
+            },
             "files": files,
         })
     );
@@ -172,6 +178,7 @@ mod tests {
                 },
             ],
             confidence: 0.65,
+            evidence: wizard_index::predict::Evidence::default(),
         };
         let text = render(&prediction);
         assert!(text.contains("(confidence 0.65)"), "{text}");

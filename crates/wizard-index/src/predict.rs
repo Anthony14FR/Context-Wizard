@@ -11,9 +11,12 @@
 //! One prediction in ten swaps its last file for the best structural candidate that learning
 //! knows nothing about, so files never opened before get a chance to be learned.
 //!
-//! Confidence is the share of the task's rare words that the predicted files hold, blended with
-//! the learned scores. On the benchmark tasks, predictions under 0.2 were never right, and the
-//! threshold of 0.55 keeps the shown ones to those where about half the files are right.
+//! Confidence comes from how strongly the words of the task single out the best file: its BM25
+//! score per word of the task the project knows, so long prompts do not inflate it, scaled so
+//! that 3 per word means 0.5, and damped below a total score of 10. It is blended with the
+//! learned scores. On 1,232 tasks mined from the history of the benchmark repositories, a
+//! quarter reached 0.5, and then the first file was right almost half the time and the first
+//! three held one right file on average, so only those are shown, three files at most.
 
 use std::collections::BTreeMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -31,9 +34,9 @@ use crate::vocabulary::Vocabulary;
 /// Share of predictions that explore a file learning knows nothing about.
 pub const EXPLORATION: f64 = 0.1;
 /// Confidence below which a prediction is not shown.
-pub const CONFIDENCE_THRESHOLD: f64 = 0.55;
+pub const CONFIDENCE_THRESHOLD: f64 = 0.5;
 /// Number of files a prediction holds.
-pub const PREDICTED_FILES: usize = 5;
+pub const PREDICTED_FILES: usize = 3;
 
 const TASK_SHARE: f64 = 0.5;
 const GLOSSARY_SHARE: f64 = 0.3;
@@ -43,6 +46,8 @@ const PIVOT_BONUS: f64 = 0.5;
 const LEARNED_SEED_WEIGHT: f64 = 2.0;
 const MAX_LINES: usize = 3;
 const MAX_SEEDS: usize = 30;
+const FULL_CONFIDENCE_PER_WORD: f64 = 6.0;
+const MIN_CONFIDENT_SCORE: f64 = 10.0;
 
 /// Settings of a prediction.
 #[derive(Debug, Clone, PartialEq)]
@@ -85,6 +90,21 @@ pub struct Prediction {
     pub files: Vec<PredictedFile>,
     /// How likely the prediction is right, between 0 and 1.
     pub confidence: f64,
+    /// The measures confidence is derived from, for evaluation.
+    pub evidence: Evidence,
+}
+
+/// Measures of how well the words of a task point to the predicted files.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Evidence {
+    /// Share of the task's rare words the predicted files hold, when the project knows any.
+    pub coverage: Option<f64>,
+    /// BM25 score of the best matching file.
+    pub top_score: f64,
+    /// Ratio of the best BM25 score to the second best, 1 or more.
+    pub margin: f64,
+    /// Number of distinct words of the task the project knows.
+    pub known_words: usize,
 }
 
 impl Prediction {
@@ -129,7 +149,7 @@ pub fn predict(input: &PredictInput<'_>, options: &PredictOptions) -> Prediction
     let structure = input.structure;
     let keywords = keywords(input.prompt);
     let words = stems(input.prompt);
-    let mut seeds = word_seeds(input.vocabulary, input.prompt);
+    let (mut seeds, top_score, margin) = word_seeds(input.vocabulary, input.prompt);
     let mut matches: BTreeMap<usize, Vec<&LocatedSymbol>> = BTreeMap::new();
     for located in input.matches {
         if let Some(node) = structure.position(&located.path)
@@ -197,6 +217,23 @@ pub fn predict(input: &PredictInput<'_>, options: &PredictOptions) -> Prediction
             explored,
         })
         .collect();
+    let (confidence, evidence) = assess(input, &files, &learned_files, alpha, (top_score, margin));
+    Prediction {
+        files,
+        confidence,
+        evidence,
+    }
+}
+
+/// Confidence of the prediction made of `files`, with the measures it is derived from.
+fn assess(
+    input: &PredictInput<'_>,
+    files: &[PredictedFile],
+    learned_files: &BTreeMap<String, f64>,
+    alpha: f64,
+    (top_score, margin): (f64, f64),
+) -> (f64, Evidence) {
+    let structure = input.structure;
     let nodes: Vec<usize> = files
         .iter()
         .filter_map(|file| structure.position(&file.path))
@@ -207,27 +244,45 @@ pub fn predict(input: &PredictInput<'_>, options: &PredictOptions) -> Prediction
             .iter()
             .filter_map(|file| learned_files.get(&file.path).copied()),
     );
-    let confidence = match coverage {
-        Some(coverage) if learned_files.is_empty() => coverage,
-        Some(coverage) => alpha * coverage + (1.0 - alpha) * learned,
-        None => learned,
+    let known = input.vocabulary.known_words(input.prompt).max(1);
+    let per_word = top_score / f64::from(u32::try_from(known).unwrap_or(u32::MAX));
+    let structural =
+        (per_word / FULL_CONFIDENCE_PER_WORD).min(1.0) * (top_score / MIN_CONFIDENT_SCORE).min(1.0);
+    let confidence = if learned_files.is_empty() {
+        structural
+    } else {
+        alpha * structural + (1.0 - alpha) * learned
+    }
+    .max(if structural == 0.0 { learned } else { 0.0 });
+    let evidence = Evidence {
+        coverage,
+        top_score,
+        margin,
+        known_words: known,
     };
-    Prediction { files, confidence }
+    (confidence, evidence)
 }
 
 /// Seeds of the ranking: the files whose words best match the task, scaled so the best is 1.
-fn word_seeds(vocabulary: &Vocabulary, prompt: &str) -> BTreeMap<usize, f64> {
+fn word_seeds(vocabulary: &Vocabulary, prompt: &str) -> (BTreeMap<usize, f64>, f64, f64) {
     let mut scored: Vec<(usize, f64)> = vocabulary.scores(prompt).into_iter().collect();
     scored.sort_by(|left, right| right.1.total_cmp(&left.1).then(left.0.cmp(&right.0)));
     scored.truncate(MAX_SEEDS);
     let top = scored.first().map_or(0.0, |(_, score)| *score);
     if top <= 0.0 {
-        return BTreeMap::new();
+        return (BTreeMap::new(), 0.0, 1.0);
     }
-    scored
+    let second = scored.get(1).map_or(0.0, |(_, score)| *score);
+    let margin = if second > 0.0 {
+        top / second
+    } else {
+        top.max(1.0)
+    };
+    let seeds = scored
         .into_iter()
         .map(|(node, score)| (node, score / top))
-        .collect()
+        .collect();
+    (seeds, top, margin)
 }
 
 fn narrowest_ranges(found: &[&LocatedSymbol]) -> Vec<(u32, u32)> {
