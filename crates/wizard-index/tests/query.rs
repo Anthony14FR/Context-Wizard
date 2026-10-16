@@ -8,6 +8,7 @@ use std::time::{Duration, SystemTime};
 
 use wizard_git::History;
 use wizard_index::build::{BuildOptions, build};
+use wizard_index::learned::{Learned, LearnedPair};
 use wizard_index::query::{explain, find_symbol, impact, refs, slice};
 use wizard_store::Index;
 
@@ -95,7 +96,21 @@ fn impact_follows_dependents_and_co_changes() {
     history
         .co_change
         .insert(("docs/guide.md".to_owned(), "src/session.py".to_owned()), 4);
-    let text = impact(&index, "src/session.py", Some(&history)).unwrap();
+    let learned = Learned {
+        co_access: vec![LearnedPair {
+            first: "src/config.py".to_owned(),
+            second: "src/session.py".to_owned(),
+            weight: 2.0,
+        }],
+    };
+    let text = impact(&index, "src/session.py", Some(&history), &learned).unwrap();
+    assert!(
+        text.contains(
+            "Usually opened with, in past sessions:
+- src/config.py"
+        ),
+        "{text}"
+    );
     assert!(
         text.contains("Direct dependents (1):\n- src/login.py"),
         "{text}"
@@ -110,7 +125,13 @@ fn impact_follows_dependents_and_co_changes() {
 #[test]
 fn slices_the_files_of_a_task() {
     let (_project, index) = project();
-    let text = slice(&index, "the session refresh fails after login", None).unwrap();
+    let text = slice(
+        &index,
+        "the session refresh fails after login",
+        None,
+        &Learned::default(),
+    )
+    .unwrap();
     let first = text.lines().nth(2).unwrap();
     assert!(
         first == "src/session.py" || first == "src/login.py",
@@ -118,7 +139,7 @@ fn slices_the_files_of_a_task() {
     );
     assert!(text.contains("class SessionStore:"), "{text}");
     assert!(
-        slice(&index, "the and for", None)
+        slice(&index, "the and for", None, &Learned::default())
             .unwrap()
             .starts_with("Describe the task")
     );

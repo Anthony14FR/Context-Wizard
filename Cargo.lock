@@ -2243,6 +2243,7 @@ dependencies = [
  "wizard-core",
  "wizard-git",
  "wizard-graph",
+ "wizard-learn",
  "wizard-parse",
  "wizard-scan",
  "wizard-store",
@@ -2269,6 +2270,7 @@ dependencies = [
  "wizard-core",
  "wizard-git",
  "wizard-index",
+ "wizard-learn",
  "wizard-store",
 ]
 

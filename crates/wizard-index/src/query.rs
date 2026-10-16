@@ -10,6 +10,7 @@ use wizard_git::History;
 use wizard_store::{Index, LocatedSymbol, StoreError, SymbolKind};
 
 use crate::graph::FileGraph;
+use crate::learned::Learned;
 
 const MAX_MATCHES: usize = 20;
 const MAX_FILES: usize = 15;
@@ -124,7 +125,7 @@ pub fn explain(index: &Index, path: &str) -> Result<String, StoreError> {
         ));
     };
     let symbols = index.symbols()?;
-    let graph = FileGraph::new(&symbols, None);
+    let graph = FileGraph::new(&symbols, None, &Learned::default());
     let language = record.language.as_deref().unwrap_or("unknown language");
     let mut text = format!("# {path} ({language}, {} bytes)\n", record.size);
     let outline: Vec<&LocatedSymbol> = own
@@ -151,9 +152,14 @@ pub fn explain(index: &Index, path: &str) -> Result<String, StoreError> {
 /// # Errors
 ///
 /// Returns an error when the index cannot be read.
-pub fn impact(index: &Index, path: &str, history: Option<&History>) -> Result<String, StoreError> {
+pub fn impact(
+    index: &Index,
+    path: &str,
+    history: Option<&History>,
+    learned: &Learned,
+) -> Result<String, StoreError> {
     let symbols = index.symbols()?;
-    let graph = FileGraph::new(&symbols, history);
+    let graph = FileGraph::new(&symbols, history, learned);
     let Some(node) = graph.position(path) else {
         return Ok(format!(
             "`{path}` has no indexed symbols. Paths are relative to the project root, with `/`.\n"
@@ -190,6 +196,17 @@ pub fn impact(index: &Index, path: &str, history: Option<&History>) -> Result<St
             }
         }
     }
+    let opened: Vec<&str> = learned
+        .partners(path)
+        .take(MAX_FILES)
+        .map(|(partner, _)| partner)
+        .collect();
+    if !opened.is_empty() {
+        let _ = writeln!(text, "Usually opened with, in past sessions:");
+        for partner in opened {
+            let _ = writeln!(text, "- {partner}");
+        }
+    }
     Ok(text)
 }
 
@@ -202,13 +219,18 @@ pub fn impact(index: &Index, path: &str, history: Option<&History>) -> Result<St
 /// # Errors
 ///
 /// Returns an error when the index cannot be read.
-pub fn slice(index: &Index, task: &str, history: Option<&History>) -> Result<String, StoreError> {
+pub fn slice(
+    index: &Index,
+    task: &str,
+    history: Option<&History>,
+    learned: &Learned,
+) -> Result<String, StoreError> {
     let keywords = keywords(task);
     if keywords.is_empty() {
         return Ok("Describe the task with a few specific words, such as names of features, modules or symbols.\n".to_owned());
     }
     let symbols = index.symbols()?;
-    let graph = FileGraph::new(&symbols, history);
+    let graph = FileGraph::new(&symbols, history, learned);
     let mut seeds: BTreeMap<usize, f64> = BTreeMap::new();
     let mut matches: BTreeMap<usize, Vec<&LocatedSymbol>> = BTreeMap::new();
     for located in &symbols {

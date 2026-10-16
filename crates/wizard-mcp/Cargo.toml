@@ -16,6 +16,7 @@ tokio.workspace = true
 wizard-core.workspace = true
 wizard-git.workspace = true
 wizard-index.workspace = true
+wizard-learn.workspace = true
 wizard-store.workspace = true
 
 [dev-dependencies]
