@@ -11,6 +11,7 @@ use std::process::ExitCode;
 use serde_json::json;
 use wizard_core::decision::{self, State};
 
+use crate::context;
 use crate::event::{Event, EventName};
 use crate::install;
 use crate::opt_in;
@@ -27,7 +28,10 @@ pub(crate) fn run() -> ExitCode {
     {
         return ExitCode::SUCCESS;
     }
-    if let Some(output) = Event::parse(&input).and_then(|event| respond(&event)) {
+    std::panic::set_hook(Box::new(|_| {}));
+    let response =
+        std::panic::catch_unwind(|| Event::parse(&input).and_then(|event| respond(&event)));
+    if let Ok(Some(output)) = response {
         let mut stdout = io::stdout().lock();
         let _ = stdout.write_all(output.as_bytes());
         let _ = stdout.flush();
@@ -41,6 +45,12 @@ fn respond(event: &Event) -> Option<String> {
     }
     let project = project_dir(event)?;
     match decision::load(&project).ok()? {
+        State::Decided(decision)
+            if decision.enabled && event.hook_event_name == EventName::SessionStart =>
+        {
+            let text = context::refreshed_overview(&project)?;
+            Some(additional_context("SessionStart", &text))
+        }
         State::Undecided if event.hook_event_name == EventName::UserPromptSubmit => {
             let binary = env::current_exe().ok()?;
             let question = opt_in::question(&binary, &project)?;
