@@ -1,6 +1,7 @@
 //! Index building and context maps of Context Wizard.
 
 pub mod build;
+pub mod exact;
 pub mod graph;
 pub mod learned;
 pub mod map;

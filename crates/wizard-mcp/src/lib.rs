@@ -24,6 +24,7 @@ use serde::Deserialize;
 use wizard_core::decision;
 use wizard_git::{History, HistoryOptions};
 use wizard_index::build::{BuildOptions, build};
+use wizard_index::exact;
 use wizard_index::learned::Learned;
 use wizard_index::map::{L1_BUDGET, map};
 use wizard_index::overview::overview;
@@ -75,6 +76,16 @@ pub struct NameParameter {
 pub struct PathParameter {
     /// Path relative to the project root, with `/` separators, such as `src/app/main.ts`.
     pub path: String,
+}
+
+/// A symbol name, optionally in one file.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct DefinitionParameter {
+    /// Name of a function, class, method, type, constant or variable, as written in the code.
+    pub name: String,
+    /// File defining it, relative to the project root, when several files define the name.
+    #[serde(default)]
+    pub path: Option<String>,
 }
 
 /// An optional kind of framework fact.
@@ -137,6 +148,22 @@ impl WizardServer {
     async fn refs(&self, Parameters(parameter): Parameters<NameParameter>) -> String {
         self.answer(false, move |_, index, _, _| {
             query::refs(index, &parameter.name)
+        })
+        .await
+    }
+
+    #[tool(
+        description = "Exact references of a definition, resolved by the project's language server (rust-analyzer, typescript-language-server, pyright, pylsp, intelephense, gopls or clangd) when one is installed. Slower than refs, which matches names only; use it when a name is shared by unrelated symbols."
+    )]
+    async fn exact_refs(&self, Parameters(parameter): Parameters<DefinitionParameter>) -> String {
+        self.answer(false, move |project, index, _, _| {
+            exact::exact_refs(
+                project,
+                index,
+                &parameter.name,
+                parameter.path.as_deref(),
+                exact::LSP_TIMEOUT,
+            )
         })
         .await
     }

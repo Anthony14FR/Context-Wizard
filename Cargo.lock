@@ -2275,6 +2275,7 @@ dependencies = [
  "wizard-git",
  "wizard-graph",
  "wizard-learn",
+ "wizard-lsp",
  "wizard-parse",
  "wizard-recipes",
  "wizard-scan",
@@ -2289,6 +2290,14 @@ dependencies = [
  "tempfile",
  "wizard-core",
  "wizard-store",
+]
+
+[[package]]
+name = "wizard-lsp"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

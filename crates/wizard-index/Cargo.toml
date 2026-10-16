@@ -15,6 +15,7 @@ wizard-budget.workspace = true
 wizard-core.workspace = true
 wizard-git.workspace = true
 wizard-learn.workspace = true
+wizard-lsp.workspace = true
 wizard-graph.workspace = true
 wizard-parse.workspace = true
 wizard-recipes.workspace = true

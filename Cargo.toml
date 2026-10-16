@@ -17,6 +17,7 @@ wizard-git = { path = "crates/wizard-git" }
 wizard-graph = { path = "crates/wizard-graph" }
 wizard-index = { path = "crates/wizard-index" }
 wizard-learn = { path = "crates/wizard-learn" }
+wizard-lsp = { path = "crates/wizard-lsp" }
 wizard-mcp = { path = "crates/wizard-mcp" }
 wizard-parse = { path = "crates/wizard-parse" }
 wizard-recipes = { path = "crates/wizard-recipes" }
