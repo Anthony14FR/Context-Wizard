@@ -17,6 +17,7 @@ wizard-git.workspace = true
 wizard-learn.workspace = true
 wizard-graph.workspace = true
 wizard-parse.workspace = true
+wizard-recipes.workspace = true
 wizard-scan.workspace = true
 wizard-store.workspace = true
 

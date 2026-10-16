@@ -11,6 +11,7 @@ mod learn;
 mod map;
 mod opt_in;
 mod prediction;
+mod recipes;
 mod serve;
 mod stats;
 mod status;
@@ -63,6 +64,12 @@ enum Command {
         #[arg(long)]
         project: Option<PathBuf>,
     },
+    /// Lists the framework recipes of a project and checks them, failing on a broken recipe.
+    Recipes {
+        /// Project root. Defaults to the current directory.
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+    },
     /// Shows what Context Wizard learned about a project and how well it predicts.
     Stats {
         /// Project root. Defaults to the current directory.
@@ -98,6 +105,7 @@ fn main() -> ExitCode {
         Some(Command::Index { project }) => index::run(&project),
         Some(Command::Map { level, project }) => map::run(&project, level),
         Some(Command::Serve { project }) => serve::run(project),
+        Some(Command::Recipes { project }) => recipes::run(&project),
         Some(Command::Stats { project }) => stats::run(&project),
         Some(Command::Status { project }) => status::run(&project),
         Some(Command::UpdateCheck) => update::check(),

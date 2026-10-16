@@ -19,10 +19,12 @@ wizard-index = { path = "crates/wizard-index" }
 wizard-learn = { path = "crates/wizard-learn" }
 wizard-mcp = { path = "crates/wizard-mcp" }
 wizard-parse = { path = "crates/wizard-parse" }
+wizard-recipes = { path = "crates/wizard-recipes" }
 wizard-scan = { path = "crates/wizard-scan" }
 wizard-store = { path = "crates/wizard-store" }
 blake3 = "1.8.7"
 clap = { version = "4.6.7", features = ["derive"] }
+globset = "0.4.20"
 ignore = "0.4.33"
 proptest = "1.12.0"
 rayon = "1.12.0"
@@ -35,6 +37,7 @@ serde_json = { version = "1.0.154", features = ["preserve_order"] }
 sha2 = "0.11.1"
 streaming-iterator = "0.1.9"
 tempfile = "3.27.0"
+toml = "1.1.8"
 tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros", "io-std", "sync", "time"] }
 tree-sitter = "0.27.1"
 tree-sitter-language-pack = "=1.22.1"

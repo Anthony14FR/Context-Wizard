@@ -19,6 +19,9 @@ pub enum SymbolKind {
     Key,
     /// A frequent identifier of a file without a grammar.
     Identifier,
+    /// A fact extracted by a framework recipe, such as a route; its role names the recipe and
+    /// the extraction as `recipe/extract`.
+    Fact,
 }
 
 impl SymbolKind {
@@ -29,6 +32,7 @@ impl SymbolKind {
             Self::Heading => "heading",
             Self::Key => "key",
             Self::Identifier => "identifier",
+            Self::Fact => "fact",
         }
     }
 
@@ -39,6 +43,7 @@ impl SymbolKind {
             "heading" => Self::Heading,
             "key" => Self::Key,
             "identifier" => Self::Identifier,
+            "fact" => Self::Fact,
             _ => return None,
         })
     }
@@ -212,6 +217,19 @@ impl Index {
         }
         symbols.sort_unstable();
         Ok(symbols)
+    }
+
+    /// Returns every fact extracted by a recipe, sorted by path and line.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the database cannot be queried.
+    pub fn facts(&self) -> Result<Vec<LocatedSymbol>, StoreError> {
+        self.query_symbols(
+            "SELECT path, kind, name, role, line, end_line, signature, count FROM symbols
+             WHERE kind = 'fact'",
+            [],
+        )
     }
 
     fn query_symbols<P: rusqlite::Params>(

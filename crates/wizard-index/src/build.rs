@@ -1,5 +1,6 @@
 //! The indexing pipeline: scan, change detection, extraction and storage.
 
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 use std::fs;
@@ -13,6 +14,7 @@ use wizard_parse::lexical::{self, Entry, EntryKind};
 use wizard_scan::{ScanOptions, scan};
 use wizard_store::{Changes, FileSymbols, Index, StoreError, SymbolKind, SymbolRecord};
 
+use crate::recipes::Applied;
 use crate::structure::Structure;
 
 const HEAD_BYTES: usize = 256;
@@ -84,18 +86,42 @@ pub fn build(project: &Path, options: &BuildOptions) -> Result<BuildReport, Inde
     let report = scan(project, &options.scan);
     let mut index = Index::open_project(project)?;
     let changes = index.refresh(project, &report.files)?;
-    let to_extract: Vec<&String> = changes.added.iter().chain(&changes.modified).collect();
+    let applied = Applied::detect(project, &report.files);
+    let mut to_extract: BTreeSet<String> = changes
+        .added
+        .iter()
+        .chain(&changes.modified)
+        .cloned()
+        .collect();
+    let recipes_changed = applied.changed_since_last_build(project);
+    if recipes_changed {
+        to_extract.extend(
+            report
+                .files
+                .iter()
+                .filter(|file| applied.reads(&file.path))
+                .map(|file| file.path.clone()),
+        );
+        to_extract.extend(index.facts()?.into_iter().map(|fact| fact.path));
+    }
+    let to_extract: Vec<String> = to_extract.into_iter().collect();
     let extracted: Vec<(FileSymbols, bool)> = to_extract
         .par_iter()
         .filter_map(|path| {
             let content = fs::read(project.join(path)).ok()?;
-            Some(extract_file(path, &String::from_utf8_lossy(&content)))
+            let content = String::from_utf8_lossy(&content);
+            let (mut file, tagged) = extract_file(path, &content);
+            file.symbols.extend(applied.symbols(path, &content));
+            Some((file, tagged))
         })
         .collect();
     let tagged = extracted.iter().filter(|(_, tagged)| *tagged).count();
     let lexical = extracted.len() - tagged;
     let files: Vec<FileSymbols> = extracted.into_iter().map(|(file, _)| file).collect();
     index.store_symbols(&files)?;
+    if recipes_changed {
+        applied.mark_built(project);
+    }
     let _ = Structure::load(&mut index);
     Ok(BuildReport {
         files: report.files.len(),

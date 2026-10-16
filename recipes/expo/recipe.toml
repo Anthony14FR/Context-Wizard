@@ -1,0 +1,37 @@
+name = "expo"
+description = "Screens and layouts of Expo Router, and React Navigation screens"
+
+[detect]
+contains = [{ file = "package.json", text = "\"expo\"" }]
+
+[[extract]]
+name = "screens"
+title = "Screens (Expo Router)"
+glob = ["app/**/*.{js,jsx,ts,tsx}", "src/app/**/*.{js,jsx,ts,tsx}"]
+exclude = ["**/_layout.*", "**/+*.*"]
+path_pattern = '^(?:src/)?app/(?P<route>.*?)(?:index)?\.[a-z]+$'
+template = "screen /{route}"
+
+[[extract]]
+name = "layouts"
+title = "Layouts (Expo Router)"
+glob = ["app/**/_layout.{js,jsx,ts,tsx}", "src/app/**/_layout.{js,jsx,ts,tsx}"]
+path_pattern = '^(?:src/)?app/(?P<route>(?:.+/)?)_layout\.[a-z]+$'
+template = "layout /{route}"
+
+[[extract]]
+name = "navigation"
+title = "Navigation screens"
+glob = ["**/*.tsx"]
+language = "tsx"
+query = "navigation.scm"
+template = "screen {name}"
+
+[[extract]]
+name = "navigation-js"
+title = "Navigation screens"
+glob = ["**/*.jsx", "**/*.js"]
+exclude = ["**/*.config.js"]
+language = "javascript"
+query = "navigation.scm"
+template = "screen {name}"

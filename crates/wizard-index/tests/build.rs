@@ -89,3 +89,61 @@ fn signatures_never_store_secrets() {
     assert!(signature.contains("[redacted]"), "{signature}");
     assert!(!signature.contains("ghp_"));
 }
+
+#[test]
+fn applies_recipes_and_reapplies_them_when_a_recipe_changes() {
+    let project = tempfile::tempdir().unwrap();
+    let root = project.path();
+    write(root, "artisan", "#!/usr/bin/env php\n");
+    write(
+        root,
+        "composer.json",
+        r#"{"require":{"laravel/framework":"^12.0"}}"#,
+    );
+    write(
+        root,
+        "routes/web.php",
+        "<?php\nRoute::get('/songs', [SongController::class, 'index']);\n",
+    );
+    write(root, "app/Console/Sync.php", "<?php\nclass Sync {}\n");
+    build(root, &BuildOptions::default()).unwrap();
+    let facts = |root: &Path| -> Vec<(String, String)> {
+        Index::open_project(root)
+            .unwrap()
+            .facts()
+            .unwrap()
+            .into_iter()
+            .map(|fact| (fact.path, fact.symbol.name))
+            .collect()
+    };
+    assert_eq!(
+        facts(root),
+        [(
+            "routes/web.php".to_owned(),
+            "get /songs -> [SongController::class, 'index']".to_owned()
+        )]
+    );
+
+    let recipe = root.join(".claude/context-wizard/recipes/console");
+    fs::create_dir_all(&recipe).unwrap();
+    fs::write(
+        recipe.join("recipe.toml"),
+        "name = \"console\"\n[detect]\nfiles = [\"artisan\"]\n[[extract]]\nname = \"commands\"\nglob = [\"app/Console/*.php\"]\npath_pattern = '(?P<name>[A-Za-z]+)\\.php$'\ntemplate = \"command {name}\"\n",
+    )
+    .unwrap();
+    let rebuilt = build(root, &BuildOptions::default()).unwrap();
+    assert!(rebuilt.changes.is_empty());
+    assert!(facts(root).contains(&("app/Console/Sync.php".to_owned(), "command Sync".to_owned())));
+
+    fs::remove_dir_all(&recipe).unwrap();
+    build(root, &BuildOptions::default()).unwrap();
+    assert_eq!(facts(root).len(), 1);
+    let index = Index::open_project(root).unwrap();
+    assert!(
+        index
+            .symbols_of("app/Console/Sync.php")
+            .unwrap()
+            .iter()
+            .all(|symbol| symbol.symbol.kind != SymbolKind::Fact)
+    );
+}

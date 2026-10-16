@@ -17,6 +17,7 @@ wizard-core.workspace = true
 wizard-index.workspace = true
 wizard-learn.workspace = true
 wizard-mcp.workspace = true
+wizard-recipes.workspace = true
 wizard-store.workspace = true
 clap.workspace = true
 serde.workspace = true

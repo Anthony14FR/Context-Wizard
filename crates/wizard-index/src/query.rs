@@ -5,6 +5,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
+use std::path::Path;
 
 use wizard_core::text::keywords;
 use wizard_git::History;
@@ -13,12 +14,14 @@ use wizard_store::{Index, LocatedSymbol, StoreError, SymbolKind};
 use crate::graph::FileGraph;
 use crate::learned::Learned;
 use crate::map::{TEST_PENALTY, is_test_path};
+use crate::recipes;
 use crate::structure::lift;
 
 const MAX_MATCHES: usize = 20;
 const MAX_FILES: usize = 15;
 const MAX_LINES_PER_FILE: usize = 12;
 const MAX_SLICE_FILES: usize = 10;
+const MAX_FACTS_PER_KIND: usize = 80;
 
 /// Definitions named `name`, or, when none matches exactly, definitions whose name contains it.
 ///
@@ -259,6 +262,67 @@ pub fn slice(
     Ok(text)
 }
 
+/// Facts found by framework recipes, grouped by kind, optionally only the kinds whose name
+/// or title contains `kind`.
+///
+/// # Errors
+///
+/// Returns an error when the index cannot be read.
+pub fn facts(index: &Index, project: &Path, kind: Option<&str>) -> Result<String, StoreError> {
+    let titles: BTreeMap<String, String> = recipes::titles(project).into_iter().collect();
+    let wanted = kind
+        .map(str::to_lowercase)
+        .filter(|kind| !kind.trim().is_empty());
+    let mut groups: BTreeMap<String, Vec<LocatedSymbol>> = BTreeMap::new();
+    for fact in index.facts()? {
+        let title = titles
+            .get(&fact.symbol.role)
+            .cloned()
+            .unwrap_or_else(|| fact.symbol.role.clone());
+        let heading = format!(
+            "{title} ({})",
+            fact.symbol.role.split('/').next().unwrap_or_default()
+        );
+        if wanted.as_ref().is_none_or(|wanted| {
+            heading.to_lowercase().contains(wanted.as_str())
+                || fact.symbol.role.to_lowercase().contains(wanted.as_str())
+        }) {
+            groups.entry(heading).or_default().push(fact);
+        }
+    }
+    if groups.is_empty() {
+        return Ok(match wanted {
+            Some(kind) => format!(
+                "No framework fact matches `{kind}`. Call `facts` without a kind to see every kind.\n"
+            ),
+            None => {
+                "No framework recipe applies to this project, so there are no framework facts.\n"
+                    .to_owned()
+            }
+        });
+    }
+    let mut text = String::new();
+    for (heading, facts) in &groups {
+        let _ = writeln!(text, "## {heading}, {} found", facts.len());
+        for fact in facts.iter().take(MAX_FACTS_PER_KIND) {
+            let _ = writeln!(
+                text,
+                "- {}:{} {}",
+                fact.path, fact.symbol.line, fact.symbol.name
+            );
+        }
+        if facts.len() > MAX_FACTS_PER_KIND {
+            let _ = writeln!(
+                text,
+                "- and {} more; pass a more specific kind or use `find_symbol`",
+                facts.len() - MAX_FACTS_PER_KIND
+            );
+        }
+        text.push('\n');
+    }
+    Ok(text)
+}
+
 /// Divides the score of test files by the test penalty, unless the task is about tests.
 #[allow(
     clippy::cast_precision_loss,
@@ -342,6 +406,7 @@ fn describe(located: &LocatedSymbol) -> String {
         }
         SymbolKind::Heading | SymbolKind::Key => symbol.name.clone(),
         SymbolKind::Identifier => format!("{} ({} uses)", symbol.name, symbol.count),
+        SymbolKind::Fact => format!("{} ({})", symbol.name, symbol.role),
     }
 }
 

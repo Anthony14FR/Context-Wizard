@@ -1,0 +1,60 @@
+name = "next"
+description = "File routes of the app and pages routers, and server and client boundaries"
+
+[detect]
+contains = [{ file = "package.json", text = "\"next\"" }]
+
+[[extract]]
+name = "app-pages"
+title = "Pages (app router)"
+glob = ["app/**/page.{js,jsx,ts,tsx,mdx}", "src/app/**/page.{js,jsx,ts,tsx,mdx}"]
+path_pattern = '^(?:src/)?app/(?P<route>(?:.+/)?)page\.[a-z]+$'
+template = "page /{route}"
+
+[[extract]]
+name = "app-layouts"
+title = "Layouts (app router)"
+glob = ["app/**/layout.{js,jsx,ts,tsx}", "src/app/**/layout.{js,jsx,ts,tsx}"]
+path_pattern = '^(?:src/)?app/(?P<route>(?:.+/)?)layout\.[a-z]+$'
+template = "layout /{route}"
+
+[[extract]]
+name = "route-handlers"
+title = "Route handlers"
+glob = ["app/**/route.{js,ts}", "src/app/**/route.{js,ts}"]
+path_pattern = '^(?:src/)?app/(?P<route>(?:.+/)?)route\.[a-z]+$'
+template = "handler /{route}"
+
+[[extract]]
+name = "pages-router"
+title = "Pages (pages router)"
+glob = ["pages/**/*.{js,jsx,ts,tsx}", "src/pages/**/*.{js,jsx,ts,tsx}"]
+exclude = ["**/_app.*", "**/_document.*", "**/_error.*"]
+path_pattern = '^(?:src/)?pages/(?P<route>.*?)(?:index)?\.[a-z]+$'
+template = "page /{route}"
+
+[[extract]]
+name = "client-components"
+title = "Client components"
+glob = ["**/*.tsx"]
+language = "tsx"
+query = "directive.scm"
+template = "{directive}"
+
+[[extract]]
+name = "client-components-js"
+title = "Client components"
+glob = ["**/*.jsx", "**/*.js"]
+exclude = ["**/*.config.js"]
+language = "javascript"
+query = "directive.scm"
+template = "{directive}"
+
+[[extract]]
+name = "server-actions"
+title = "Server actions and client modules"
+glob = ["**/*.ts"]
+exclude = ["**/*.d.ts"]
+language = "typescript"
+query = "directive.scm"
+template = "{directive}"
