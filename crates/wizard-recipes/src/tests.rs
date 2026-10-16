@@ -25,6 +25,9 @@ fn named(name: &str) -> Recipe {
 fn built_in_recipes_are_valid() {
     let (recipes, errors) = builtin();
     assert_eq!(errors, []);
+    for recipe in &recipes {
+        assert_eq!(recipe.check(), [], "{}", recipe.name);
+    }
     let names: Vec<&str> = recipes.iter().map(|recipe| recipe.name.as_str()).collect();
     assert_eq!(names, ["laravel", "react", "next", "expo"]);
 }
