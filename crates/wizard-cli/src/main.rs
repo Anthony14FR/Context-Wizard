@@ -8,6 +8,7 @@ mod index;
 mod install;
 mod map;
 mod opt_in;
+mod serve;
 mod status;
 
 use std::path::PathBuf;
@@ -51,6 +52,12 @@ enum Command {
         #[arg(long, default_value = ".")]
         project: PathBuf,
     },
+    /// Runs the MCP server of a project over standard input and output.
+    Serve {
+        /// Project root. Defaults to `CLAUDE_PROJECT_DIR`, then the current directory.
+        #[arg(long)]
+        project: Option<PathBuf>,
+    },
     /// Shows whether Context Wizard is enabled for a project and whether its binary is healthy.
     Status {
         /// Project root. Defaults to the current directory.
@@ -76,6 +83,7 @@ fn main() -> ExitCode {
         }
         Some(Command::Index { project }) => index::run(&project),
         Some(Command::Map { level, project }) => map::run(&project, level),
+        Some(Command::Serve { project }) => serve::run(project),
         Some(Command::Status { project }) => status::run(&project),
         None => ExitCode::SUCCESS,
     }

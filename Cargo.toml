@@ -16,6 +16,7 @@ wizard-core = { path = "crates/wizard-core" }
 wizard-git = { path = "crates/wizard-git" }
 wizard-graph = { path = "crates/wizard-graph" }
 wizard-index = { path = "crates/wizard-index" }
+wizard-mcp = { path = "crates/wizard-mcp" }
 wizard-parse = { path = "crates/wizard-parse" }
 wizard-scan = { path = "crates/wizard-scan" }
 wizard-store = { path = "crates/wizard-store" }
@@ -25,12 +26,15 @@ ignore = "0.4.33"
 proptest = "1.12.0"
 rayon = "1.12.0"
 regex = "1.13.1"
+rmcp = { version = "3.5.1", features = ["server", "macros", "transport-io", "schemars"] }
 rusqlite = { version = "0.40.2", features = ["bundled"] }
+schemars = "1.2.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["preserve_order"] }
 sha2 = "0.11.1"
 streaming-iterator = "0.1.9"
 tempfile = "3.27.0"
+tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros", "io-std", "sync", "time"] }
 tree-sitter = "0.27.1"
 tree-sitter-language-pack = "=1.22.1"
 
