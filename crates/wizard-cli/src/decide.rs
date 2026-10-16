@@ -6,7 +6,7 @@ use std::process::ExitCode;
 use wizard_core::date::Date;
 use wizard_core::{decision, settings};
 
-use crate::{context, install};
+use crate::{context, install, update};
 
 /// Records whether Context Wizard is enabled for `project` and reports the result.
 #[allow(
@@ -25,10 +25,10 @@ pub(crate) fn run(project: &Path, enabled: bool) -> ExitCode {
         decision::RELATIVE_PATH
     );
     if enabled && let Some(text) = context::refreshed_overview(project) {
-        println!(
-            "
-{text}"
-        );
+        println!("\n{text}");
+    }
+    if enabled && let Some(tip) = update::auto_update_tip() {
+        println!("\n{tip}");
     }
     let Some(plugin_id) = install::plugin_id() else {
         if !enabled {

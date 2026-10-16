@@ -11,6 +11,7 @@ mod map;
 mod opt_in;
 mod serve;
 mod status;
+mod update;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -65,6 +66,9 @@ enum Command {
         #[arg(long, default_value = ".")]
         project: PathBuf,
     },
+    /// Records the latest released version, for the update notice of later sessions.
+    #[command(hide = true)]
+    UpdateCheck,
 }
 
 /// Answer to the opt-in question.
@@ -86,6 +90,7 @@ fn main() -> ExitCode {
         Some(Command::Map { level, project }) => map::run(&project, level),
         Some(Command::Serve { project }) => serve::run(project),
         Some(Command::Status { project }) => status::run(&project),
+        Some(Command::UpdateCheck) => update::check(),
         None => ExitCode::SUCCESS,
     }
 }

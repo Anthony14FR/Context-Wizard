@@ -282,3 +282,71 @@ fn grep_for_a_known_symbol_gets_its_definition() {
     );
     assert_eq!(String::from_utf8_lossy(&grep("TODO: later").stdout), "");
 }
+
+fn session_start_with(binary: &Path, project: &Path, opt_out: Option<&str>) -> serde_json::Value {
+    let mut command = Command::new(binary);
+    command
+        .arg("hook")
+        .env("CLAUDE_PROJECT_DIR", project)
+        .env_remove("CLAUDE_PLUGIN_ROOT")
+        .env_remove("DISABLE_UPDATES")
+        .env_remove("DISABLE_AUTOUPDATER")
+        .env_remove("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped());
+    if let Some(variable) = opt_out {
+        command.env(variable, "1");
+    }
+    let mut child = command.spawn().unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(br#"{"hook_event_name":"SessionStart","source":"startup"}"#)
+        .unwrap();
+    serde_json::from_slice(&child.wait_with_output().unwrap().stdout).unwrap()
+}
+
+#[test]
+fn enabling_shows_the_auto_update_tip_once() {
+    let (_root, binary) = installed_binary("context-wizard-context-wizard");
+    let first = tempfile::tempdir().unwrap();
+    let second = tempfile::tempdir().unwrap();
+    let shown = decide_with(&binary, first.path(), "on");
+    assert!(String::from_utf8_lossy(&shown.stdout).contains("Enable auto-update"));
+    let again = decide_with(&binary, second.path(), "on");
+    assert!(!String::from_utf8_lossy(&again.stdout).contains("Enable auto-update"));
+}
+
+#[test]
+fn session_start_announces_a_newer_release_unless_updates_are_off() {
+    let (_root, binary) = installed_binary("context-wizard-context-wizard");
+    let project = tempfile::tempdir().unwrap();
+    assert!(decide_with(&binary, project.path(), "on").status.success());
+    let checked = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    std::fs::write(
+        binary
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("update-check.json"),
+        format!(r#"{{"checked":{checked},"latest":"999.0.0"}}"#),
+    )
+    .unwrap();
+    let output = session_start_with(&binary, project.path(), None);
+    let notice = output["systemMessage"].as_str().unwrap();
+    assert!(notice.contains("999.0.0 is available"), "{notice}");
+    assert!(output["hookSpecificOutput"]["additionalContext"].is_string());
+    for variable in [
+        "DISABLE_UPDATES",
+        "DISABLE_AUTOUPDATER",
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+    ] {
+        let output = session_start_with(&binary, project.path(), Some(variable));
+        assert!(output.get("systemMessage").is_none(), "{variable}");
+    }
+}

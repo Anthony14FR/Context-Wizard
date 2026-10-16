@@ -2200,6 +2200,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "tokio",
+ "ureq",
  "wizard-core",
  "wizard-index",
  "wizard-mcp",
