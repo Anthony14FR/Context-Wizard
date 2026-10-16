@@ -11,8 +11,10 @@ use std::process::ExitCode;
 use serde_json::json;
 use wizard_core::decision::{self, State};
 
+use crate::compress;
 use crate::context;
 use crate::event::{Event, EventName};
+use crate::focus;
 use crate::grep;
 use crate::install;
 use crate::learn;
@@ -67,6 +69,20 @@ fn respond(event: &Event) -> Option<String> {
                 output["systemMessage"] = json!(notice);
             }
             Some(output.to_string())
+        }
+        State::Decided(decision)
+            if decision.enabled
+                && event.hook_event_name == EventName::PreToolUse
+                && event.tool_name.as_deref() == Some("Read") =>
+        {
+            focus::read(&project, event)
+        }
+        State::Decided(decision)
+            if decision.enabled
+                && event.hook_event_name == EventName::PostToolUse
+                && event.tool_name.as_deref() == Some("Bash") =>
+        {
+            compress::bash(event)
         }
         State::Decided(decision)
             if decision.enabled

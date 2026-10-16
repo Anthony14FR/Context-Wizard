@@ -16,6 +16,8 @@ Au début de chaque session sur une base de code moyenne ou grande, Claude passe
 - **Fichiers prédits à chaque prompt.** Les cinq fichiers dont une tâche a le plus probablement besoin, avec leurs plages de lignes, injectés seulement quand la prédiction est sûre.
 - **Des réponses plutôt que des recherches.** Un serveur MCP répond aux questions de structure à partir d'un index rafraîchi avant chaque réponse.
 - **Des greps qui se répondent.** Quand Claude cherche un symbole connu avec Grep, sa définition est jointe à la recherche.
+- **Lectures ciblées.** Quand Claude lit un fichier de plus de 400 lignes sans plage, la lecture est réduite aux définitions liées à la tâche, avec le plan du fichier à côté, car chaque résultat d'outil est relu à chaque tour suivant. Sans correspondance claire, le fichier est lu en entier.
+- **Sorties de commandes raccourcies.** Les sorties de plus de 200 lignes, comme les tests et les builds, gardent leurs premières et dernières lignes et chaque erreur, échec et avertissement avec les lignes autour, et une note dit ce qui a été retiré.
 - **Apprentissage.** Chaque session apprend quels fichiers ont servi pour quel type de tâche. Les prédictions s'évaluent à la fin de chaque réponse et ajustent la confiance qu'elles accordent à l'apprentissage.
 
 ### Outils MCP

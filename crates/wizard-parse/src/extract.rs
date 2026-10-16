@@ -9,6 +9,8 @@ use tree_sitter_language_pack::{QueryKind, get_query, get_tags_query};
 
 use crate::grammar::{self, GrammarError};
 
+const MAX_DOC_COMMENTS: usize = 8;
+const MAX_DOC_CHARS: usize = 200;
 const MAX_SIGNATURE_CHARS: usize = 160;
 
 static EXTENDED_QUERIES: LazyLock<Mutex<HashMap<String, Option<Arc<Query>>>>> =
@@ -38,6 +40,8 @@ pub struct Tag {
     pub end_line: u32,
     /// First line of a definition, trimmed and shortened; empty for references.
     pub signature: String,
+    /// First sentence of the comment documenting a definition; empty when there is none.
+    pub doc: String,
 }
 
 /// Parses `source` as `language` and returns its definitions and references, sorted by line.
@@ -137,10 +141,10 @@ fn classify(capture_name: &str) -> Option<(TagKind, &str)> {
 }
 
 fn tag(kind: TagKind, role: &str, name: &str, node: Node<'_>, source: &str) -> Tag {
-    let signature = if kind == TagKind::Definition {
-        signature(node, source)
+    let (signature, doc) = if kind == TagKind::Definition {
+        (signature(node, source), documentation(node, source))
     } else {
-        String::new()
+        (String::new(), String::new())
     };
     Tag {
         line: line_number(node.start_position().row),
@@ -149,7 +153,73 @@ fn tag(kind: TagKind, role: &str, name: &str, node: Node<'_>, source: &str) -> T
         role: role.to_owned(),
         end_line: line_number(node.end_position().row),
         signature,
+        doc,
     }
+}
+
+/// The first sentence of the comment just above `node`, or of a Python docstring, cleaned of
+/// comment markers. Comments above an `export` or a decorator count for what they wrap.
+fn documentation(node: Node<'_>, source: &str) -> String {
+    let mut holder = node;
+    while let Some(parent) = holder.parent() {
+        let kind = parent.kind();
+        if kind.contains("export") || kind.contains("decorated") || kind == "attribute_item" {
+            holder = parent;
+        } else {
+            break;
+        }
+    }
+    let mut comments = Vec::new();
+    let mut previous = holder.prev_sibling();
+    while let Some(sibling) = previous {
+        if !sibling.kind().contains("comment") || comments.len() == MAX_DOC_COMMENTS {
+            break;
+        }
+        comments.push(source.get(sibling.byte_range()).unwrap_or_default());
+        previous = sibling.prev_sibling();
+    }
+    comments.reverse();
+    let mut text = comments.join("\n");
+    if text.is_empty()
+        && let Some(body) = node.child_by_field_name("body")
+        && let Some(first) = body.named_child(0)
+        && let Some(string) = if first.kind() == "expression_statement" {
+            first.named_child(0)
+        } else {
+            Some(first)
+        }
+        && string.kind() == "string"
+    {
+        source
+            .get(string.byte_range())
+            .unwrap_or_default()
+            .clone_into(&mut text);
+    }
+    first_sentence(&text)
+}
+
+fn first_sentence(comment: &str) -> String {
+    let words: Vec<&str> = comment
+        .lines()
+        .map(|line| {
+            line.trim()
+                .trim_start_matches(['/', '*', '#', '!', '-', '"', '\''])
+                .trim_end_matches(['/', '*', '"', '\''])
+                .trim()
+        })
+        .filter(|line| !line.starts_with('@') && !line.is_empty())
+        .flat_map(str::split_whitespace)
+        .collect();
+    let text = words.join(" ");
+    let lower = text.to_lowercase();
+    if lower.contains("license") || lower.contains("copyright") {
+        return String::new();
+    }
+    let end = text
+        .char_indices()
+        .find(|(position, character)| *character == '.' && text[position + 1..].starts_with(' '))
+        .map_or(text.len(), |(position, _)| position + 1);
+    text[..end].chars().take(MAX_DOC_CHARS).collect()
 }
 
 fn signature(node: Node<'_>, source: &str) -> String {

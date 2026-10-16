@@ -1,9 +1,11 @@
 //! The `wizard` binary: hook commands and the MCP server of Context Wizard.
 
 mod calibrate;
+mod compress;
 mod context;
 mod decide;
 mod event;
+mod focus;
 mod grep;
 mod hook;
 mod index;

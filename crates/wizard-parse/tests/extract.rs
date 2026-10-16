@@ -95,3 +95,48 @@ proptest::proptest! {
         let _ = wizard_parse::detect_language(&path, &content);
     }
 }
+
+#[test]
+fn definitions_carry_the_first_sentence_of_their_documentation() {
+    let doc = |language: &str, source: &str, name: &str| {
+        extract(language, source)
+            .unwrap()
+            .into_iter()
+            .find(|tag| tag.kind == TagKind::Definition && tag.name == name)
+            .unwrap()
+            .doc
+    };
+    assert_eq!(
+        doc(
+            "python",
+            "def total(items):\n    \"\"\"Sum the prices of a cart. Taxes excluded.\"\"\"\n    return 0\n",
+            "total"
+        ),
+        "Sum the prices of a cart."
+    );
+    assert_eq!(
+        doc(
+            "php",
+            "<?php\nclass Song {\n    /**\n     * Remove the track from the library.\n     * @param int $id\n     */\n    public function delete($id) {}\n}\n",
+            "delete"
+        ),
+        "Remove the track from the library."
+    );
+    assert_eq!(
+        doc(
+            "javascript",
+            "/** Plays the next track in the queue. */\nexport function playNext() {}\n",
+            "playNext"
+        ),
+        "Plays the next track in the queue."
+    );
+    assert_eq!(
+        doc(
+            "rust",
+            "/// Rounds an invoice total to cents.\nfn round(total: f64) -> f64 { total }\n",
+            "round"
+        ),
+        "Rounds an invoice total to cents."
+    );
+    assert_eq!(doc("rust", "fn bare() {}\n", "bare"), "");
+}

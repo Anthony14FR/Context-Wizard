@@ -16,6 +16,8 @@ At the start of every session on a medium or large codebase, Claude spends time 
 - **Predicted files at each prompt.** The five files a task most likely needs, with line ranges, injected only when the prediction is confident.
 - **Answers instead of searches.** An MCP server answers structural questions from an index kept fresh before every answer.
 - **Greps that answer themselves.** When Claude greps for a known symbol, its definition is attached to the search.
+- **Focused reads.** When Claude reads a file of more than 400 lines without a range, the read is narrowed to the definitions that match the task, with the file's outline beside it, since every tool result is read again at every later turn. Without a clear match the file is read whole.
+- **Shorter command outputs.** Outputs of more than 200 lines, such as test runs and builds, keep their first and last lines and every error, failure and warning with the lines around them, with a note of what was left out.
 - **Learning.** Each session teaches which files were useful for which kind of task. Predictions grade themselves at the end of each answer and adjust how much they trust learning.
 
 ### MCP tools

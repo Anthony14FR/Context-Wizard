@@ -1,17 +1,18 @@
 //! The words of each file, ranked against a task with BM25.
 //!
-//! A file's words are the stemmed parts of its definition names, headings and recipe facts, of
-//! its file name, which counts twice, and of its folder. Matching whole stemmed words weighted by rarity finds the files of a task far
-//! better than substrings: `select` no longer pulls in every component whose name contains it,
-//! and a rare word such as `podcast` outweighs a common one such as `list`.
+//! A file's words are the stemmed parts of its definition names, the comments documenting them,
+//! its headings and recipe facts, the names it uses (once each), its file name, which counts
+//! twice, and its folder. Matching whole stemmed words weighted by rarity finds the files of a
+//! task far better than substrings: `select` no longer pulls in every component whose name
+//! contains it, and a rare word such as `podcast` outweighs a common one such as `list`.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use wizard_core::text::stems;
 use wizard_store::{Index, LocatedSymbol, StoreError, SymbolKind};
 
 /// Name of the cached vocabulary in the index.
-pub const VOCABULARY_CACHE: &str = "vocabulary-v2";
+pub const VOCABULARY_CACHE: &str = "vocabulary-v4";
 
 const K1: f64 = 1.2;
 const B: f64 = 0.75;
@@ -43,18 +44,30 @@ impl Vocabulary {
             *counts.entry(term).or_default().entry(file).or_default() += weight;
             lengths[node] += weight;
         };
+        let mut used: BTreeSet<(usize, String)> = BTreeSet::new();
         for located in symbols {
-            if !matches!(
-                located.symbol.kind,
-                SymbolKind::Definition | SymbolKind::Heading | SymbolKind::Fact
-            ) {
+            let Some(node) = position(&located.path) else {
                 continue;
-            }
-            if let Some(node) = position(&located.path) {
-                for term in stems(&located.symbol.name) {
-                    add(term, node, 1);
+            };
+            match located.symbol.kind {
+                SymbolKind::Definition
+                | SymbolKind::Heading
+                | SymbolKind::Fact
+                | SymbolKind::Doc => {
+                    for term in stems(&located.symbol.name) {
+                        add(term, node, 1);
+                    }
                 }
+                SymbolKind::Reference | SymbolKind::Identifier => {
+                    for term in stems(&located.symbol.name) {
+                        used.insert((node, term));
+                    }
+                }
+                SymbolKind::Key => {}
             }
+        }
+        for (node, term) in used {
+            add(term, node, 1);
         }
         for (node, path) in paths.iter().enumerate() {
             let mut parts = path.rsplit('/');

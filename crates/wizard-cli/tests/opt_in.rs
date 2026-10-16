@@ -2,6 +2,7 @@
 
 #![allow(clippy::unwrap_used)]
 
+use std::fmt::Write as _;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
@@ -512,4 +513,68 @@ fn enabling_allows_the_plugin_tools_and_disabling_removes_them() {
             .unwrap()
             .contains("mcp__plugin_")
     );
+}
+
+#[test]
+fn large_reads_are_focused_and_long_outputs_shortened() {
+    let project = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(project.path().join("src")).unwrap();
+    let mut source = String::new();
+    for index in 0..300 {
+        let _ = write!(source, "def helper_{index}():\n    return {index}\n");
+    }
+    source.push_str("def refund_invoice(total):\n    return -total\n");
+    let file = project.path().join("src/billing.py");
+    std::fs::write(&file, &source).unwrap();
+    assert!(decide(project.path(), "on").status.success());
+    let prompt = r#"{"hook_event_name":"UserPromptSubmit","session_id":"f1","prompt":"the refund of an invoice is wrong"}"#;
+    assert!(hook_with(project.path(), prompt).status.success());
+    let path = serde_json::to_string(file.to_str().unwrap()).unwrap();
+    let read = hook_with(
+        project.path(),
+        &format!(
+            r#"{{"hook_event_name":"PreToolUse","session_id":"f1","tool_name":"Read","tool_input":{{"file_path":{path}}}}}"#
+        ),
+    );
+    let value: serde_json::Value = serde_json::from_slice(&read.stdout).unwrap();
+    let input = &value["hookSpecificOutput"]["updatedInput"];
+    assert!(input["offset"].as_u64().unwrap() > 550, "{value}");
+    assert!(input["limit"].as_u64().unwrap() < 100, "{value}");
+    assert_eq!(
+        input["file_path"],
+        serde_json::json!(file.to_str().unwrap())
+    );
+    assert!(
+        value["hookSpecificOutput"]["additionalContext"]
+            .as_str()
+            .unwrap()
+            .contains("`refund_invoice` is defined")
+    );
+
+    let ranged = hook_with(
+        project.path(),
+        &format!(
+            r#"{{"hook_event_name":"PreToolUse","session_id":"f1","tool_name":"Read","tool_input":{{"file_path":{path},"offset":1,"limit":10}}}}"#
+        ),
+    );
+    assert_eq!(ranged.stdout, b"");
+
+    let log: Vec<String> = (0..600).map(|line| format!("test {line} ... ok")).collect();
+    let mut log = log.join("\n");
+    log.push_str("\ntest refund ... FAILED\n");
+    let bash = serde_json::json!({
+        "hook_event_name": "PostToolUse",
+        "session_id": "f1",
+        "tool_name": "Bash",
+        "tool_input": {"command": "pytest"},
+        "tool_response": {"stdout": log, "stderr": "", "interrupted": false, "isImage": false}
+    });
+    let output = hook_with(project.path(), &bash.to_string());
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let updated = &value["hookSpecificOutput"]["updatedToolOutput"];
+    let stdout = updated["stdout"].as_str().unwrap();
+    assert!(stdout.contains("test refund ... FAILED"));
+    assert!(stdout.lines().count() < 150, "{}", stdout.lines().count());
+    assert_eq!(updated["interrupted"], false);
+    assert_eq!(updated["isImage"], false);
 }

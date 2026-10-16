@@ -22,6 +22,9 @@ pub enum SymbolKind {
     /// A fact extracted by a framework recipe, such as a route; its role names the recipe and
     /// the extraction as `recipe/extract`.
     Fact,
+    /// The first sentence of the comment documenting a definition, on the definition's line;
+    /// its role is the name of the definition.
+    Doc,
 }
 
 impl SymbolKind {
@@ -33,6 +36,7 @@ impl SymbolKind {
             Self::Key => "key",
             Self::Identifier => "identifier",
             Self::Fact => "fact",
+            Self::Doc => "doc",
         }
     }
 
@@ -44,6 +48,7 @@ impl SymbolKind {
             "key" => Self::Key,
             "identifier" => Self::Identifier,
             "fact" => Self::Fact,
+            "doc" => Self::Doc,
             _ => return None,
         })
     }
