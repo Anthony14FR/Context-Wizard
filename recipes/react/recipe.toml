@@ -1,0 +1,48 @@
+name = "react"
+description = "Components with their props, and custom hooks"
+
+[detect]
+contains = [{ file = "package.json", text = "\"react\"" }]
+
+[[extract]]
+name = "components"
+title = "Components"
+glob = ["**/*.tsx"]
+language = "tsx"
+query = "components.scm"
+template = "<{component}> {props}"
+
+[[extract]]
+name = "components-js"
+title = "Components"
+glob = ["**/*.jsx", "**/*.js"]
+exclude = ["**/*.config.js", "**/dist/**", "**/build/**"]
+language = "javascript"
+query = "components.scm"
+template = "<{component}> {props}"
+
+[[extract]]
+name = "hooks"
+title = "Custom hooks"
+glob = ["**/*.tsx"]
+language = "tsx"
+query = "hooks.scm"
+template = "{hook}{parameters}"
+
+[[extract]]
+name = "hooks-ts"
+title = "Custom hooks"
+glob = ["**/*.ts"]
+exclude = ["**/*.d.ts"]
+language = "typescript"
+query = "hooks.scm"
+template = "{hook}{parameters}"
+
+[[extract]]
+name = "hooks-js"
+title = "Custom hooks"
+glob = ["**/*.js", "**/*.jsx"]
+exclude = ["**/*.config.js", "**/dist/**", "**/build/**"]
+language = "javascript"
+query = "hooks.scm"
+template = "{hook}{parameters}"

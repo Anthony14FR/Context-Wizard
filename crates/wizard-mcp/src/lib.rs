@@ -77,6 +77,15 @@ pub struct PathParameter {
     pub path: String,
 }
 
+/// An optional kind of framework fact.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct KindParameter {
+    /// Kind of fact, such as `routes`, `relations`, `schema`, `components`, `hooks`, `pages` or
+    /// `screens`. Leave it out to list every kind.
+    #[serde(default)]
+    pub kind: Option<String>,
+}
+
 /// A task described in natural language.
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct TaskParameter {
@@ -148,6 +157,16 @@ impl WizardServer {
     async fn impact(&self, Parameters(parameter): Parameters<PathParameter>) -> String {
         self.answer(true, move |_, index, history, learned| {
             query::impact(index, &parameter.path, history, learned)
+        })
+        .await
+    }
+
+    #[tool(
+        description = "Framework facts found by recipes, with file and line: routes, Eloquent relations, database schema, React components and hooks, Next pages and Expo screens. Pass a kind to list only those."
+    )]
+    async fn facts(&self, Parameters(parameter): Parameters<KindParameter>) -> String {
+        self.answer(false, move |project, index, _, _| {
+            query::facts(index, project, parameter.kind.as_deref())
         })
         .await
     }

@@ -122,6 +122,7 @@ fn serves_the_tools_of_an_enabled_project() {
         names,
         [
             "explain",
+            "facts",
             "find_symbol",
             "impact",
             "map",

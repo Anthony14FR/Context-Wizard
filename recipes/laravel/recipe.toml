@@ -1,0 +1,38 @@
+name = "laravel"
+description = "Routes, Eloquent relations and the database schema from migrations"
+
+[detect]
+files = ["artisan"]
+contains = [{ file = "composer.json", text = "laravel/framework" }]
+
+[[extract]]
+name = "routes"
+title = "Routes"
+glob = ["routes/**/*.php"]
+language = "php"
+query = "routes.scm"
+template = "{verb} {uri} -> {action}"
+
+[[extract]]
+name = "relations"
+title = "Eloquent relations"
+glob = ["app/Models/**/*.php", "app/*.php"]
+language = "php"
+query = "relations.scm"
+template = "{relation}: {kind} {target?}"
+
+[[extract]]
+name = "schema"
+title = "Database schema"
+glob = ["database/migrations/**/*.php"]
+language = "php"
+query = "migrations.scm"
+template = "{operation} table {table}"
+
+[[extract]]
+name = "columns"
+title = "Database columns"
+glob = ["database/migrations/**/*.php"]
+language = "php"
+query = "columns.scm"
+template = "column {column}: {type}"

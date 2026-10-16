@@ -14,6 +14,8 @@ use wizard_scan::FileEntry;
 use wizard_scan::projects::{Ecosystem, Project, detect_projects};
 use wizard_store::{FileRecord, Index, StoreError};
 
+use crate::recipes;
+
 /// Hard cap of the overview, in estimated tokens.
 pub const L0_BUDGET: u64 = 800;
 
@@ -99,6 +101,7 @@ pub fn overview(project: &Path, index: &Index) -> Result<String, StoreError> {
         format!("Project: {name}, {} indexed files.", files.len()),
     ]];
     sections.push(stack(&files, &projects));
+    sections.push(frameworks(project, index)?);
     sections.push(sub_projects(&projects));
     sections.push(entry_points(&files));
     sections.push(commands(project, &projects));
@@ -158,6 +161,36 @@ fn stack(files: &[FileRecord], projects: &[Project]) -> Vec<String> {
         lines.push(format!("Languages by files: {}.", names.join(", ")));
     }
     if lines.len() == 1 { Vec::new() } else { lines }
+}
+
+fn frameworks(project: &Path, index: &Index) -> Result<Vec<String>, StoreError> {
+    let facts = index.facts()?;
+    if facts.is_empty() {
+        return Ok(Vec::new());
+    }
+    let titles: BTreeMap<String, String> = recipes::titles(project).into_iter().collect();
+    let mut counts: BTreeMap<&str, BTreeMap<String, usize>> = BTreeMap::new();
+    for fact in &facts {
+        let (recipe, _) = fact
+            .symbol
+            .role
+            .split_once('/')
+            .unwrap_or((&fact.symbol.role, ""));
+        let title = titles
+            .get(&fact.symbol.role)
+            .cloned()
+            .unwrap_or_else(|| fact.symbol.role.clone());
+        *counts.entry(recipe).or_default().entry(title).or_default() += 1;
+    }
+    let mut lines = vec!["Framework facts (the `facts` tool lists them):".to_owned()];
+    for (recipe, kinds) in counts {
+        let kinds: Vec<String> = kinds
+            .into_iter()
+            .map(|(title, count)| format!("{count} {}", title.to_lowercase()))
+            .collect();
+        lines.push(format!("- {recipe}: {}", kinds.join(", ")));
+    }
+    Ok(lines)
 }
 
 fn sub_projects(projects: &[Project]) -> Vec<String> {
