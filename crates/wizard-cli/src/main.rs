@@ -7,6 +7,7 @@ mod grep;
 mod hook;
 mod index;
 mod install;
+mod learn;
 mod map;
 mod opt_in;
 mod serve;

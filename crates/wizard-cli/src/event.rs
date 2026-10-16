@@ -36,6 +36,15 @@ pub(crate) struct Event {
     /// Arguments of the tool, for tool events.
     #[serde(default)]
     pub(crate) tool_input: Option<serde_json::Value>,
+    /// Result of the tool, for `PostToolUse`.
+    #[serde(default)]
+    pub(crate) tool_response: Option<serde_json::Value>,
+    /// Identifier of the session.
+    #[serde(default)]
+    pub(crate) session_id: Option<String>,
+    /// Text submitted by the user, for `UserPromptSubmit`.
+    #[serde(default)]
+    pub(crate) prompt: Option<String>,
 }
 
 impl Event {
