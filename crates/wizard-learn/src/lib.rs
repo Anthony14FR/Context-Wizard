@@ -4,7 +4,8 @@
 //! the files read, the searches and their result counts, the files edited, and the end of each
 //! answer. Events are linked by session and kept in `.wizard/learn.db`. Each `Stop`
 //! consolidates its session into per-file outcomes and map gaps, from which the learning
-//! signals are read, and past prompts are matched against a new task to predict its files.
+//! signals are read, past prompts are matched against a new task to predict its files, and
+//! the words of past tasks are mapped to the files they refer to.
 //!
 //! Unlike the index, this store cannot be rebuilt from the project, so a schema change migrates
 //! it instead of dropping it. A database written by a newer build is left untouched, and a
@@ -19,9 +20,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use rusqlite::{Connection, ErrorCode, OptionalExtension, Row, TransactionBehavior, params};
 use wizard_store::{StoreError, data_directory};
 
+mod glossary;
 mod signals;
 mod tasks;
 
+pub use glossary::{GLOSSARY_MIN_SESSIONS, GlossaryEntry};
 pub use signals::{
     CO_ACCESS_MAX_FILES, CoAccess, FileSignal, Gap, Outcome, PIVOT_SESSIONS, consolidate_events,
 };
