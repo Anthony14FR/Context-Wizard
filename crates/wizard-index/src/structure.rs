@@ -53,24 +53,6 @@ impl Structure {
         }
     }
 
-    /// Names of definitions containing one of `keywords`, which are expected in lowercase.
-    #[must_use]
-    pub fn names_matching(&self, keywords: &[String]) -> Vec<&str> {
-        if keywords.is_empty() {
-            return Vec::new();
-        }
-        self.names
-            .iter()
-            .filter(|name| {
-                let lower = name.to_lowercase();
-                keywords
-                    .iter()
-                    .any(|keyword| lower.contains(keyword.as_str()))
-            })
-            .map(String::as_str)
-            .collect()
-    }
-
     /// Reads the cached structure of `index`, building and caching it when missing.
     ///
     /// # Errors
@@ -259,10 +241,6 @@ mod tests {
         let structure = Structure::build(&hub_project());
         let bytes = structure.to_bytes();
         assert_eq!(Structure::from_bytes(&bytes), Some(structure.clone()));
-        assert_eq!(
-            structure.names_matching(&["invo".to_owned(), "ta".to_owned()]),
-            ["invoice", "tax"]
-        );
         assert_eq!(Structure::from_bytes(&bytes[..10]), None);
     }
 

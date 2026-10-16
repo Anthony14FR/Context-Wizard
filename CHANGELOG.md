@@ -2,6 +2,20 @@
 
 All notable changes to Context Wizard are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-16
+
+### Changed
+
+- Predictions rank files with BM25 over stemmed words of definition names, file names and folders, instead of substrings, so a common word no longer pulls in every name that contains it. On the benchmark's locate tasks, recall of the predicted files rose from 14% to 19%.
+- A prediction is shown only when the predicted files hold the rare words of the task, or when learning vouches for them. On the benchmark tasks, predictions are now shown for 38% of prompts instead of 86%, with a recall of 34% instead of 15% when shown, and 88% of the shown ones include at least one right file.
+- The `slice` tool uses the same ranking, and documentation ranks after code unless the task is about it.
+- The session overview says what each tool is for, and the prediction text points to `explain` for reading a file's outline.
+- Enabling a project allows the plugin's read-only tools, so Claude Code no longer asks before each first use.
+
+### Added
+
+- The benchmark measures exploration tokens, runs plugin mode `cold` or `warm`, and grades predictions offline with `bench/eval_predictions.py`.
+
 ## [0.1.0] - 2026-10-16
 
 First public release.
@@ -42,4 +56,5 @@ First public release.
 - `wizard calibrate` measures token ratios with Anthropic's `count_tokens` endpoint, on request only.
 - Property-based fuzzing of every parser of untrusted input, and a threat model.
 
+[0.2.0]: https://github.com/Anthony14FR/Context-Wizard/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Anthony14FR/Context-Wizard/releases/tag/v0.1.0

@@ -1,32 +1,37 @@
 //! Prediction of the files a task needs.
 //!
 //! Each file gets `score = α · structural + (1 − α) · learned`. The structural part is the lift
-//! of a personalised `PageRank` seeded by the task's keywords and by learned files, with tests
-//! ranked after production code unless the task is about tests. The learned part
+//! of a personalised `PageRank` seeded by the files whose words best match the task (BM25 over
+//! stemmed words) and by learned files, with tests and documentation ranked after production
+//! code unless the task is about them. The learned part
 //! combines the files of similar past sessions, the domain glossary and each file's own history
 //! of useful and noisy reads, all faded with a 30-day half-life. Both parts are scaled to 1 for
 //! the best file, and α stays between 0.5 and 0.9 so the structure of the code always counts.
 //!
 //! One prediction in ten swaps its last file for the best structural candidate that learning
-//! knows nothing about, so files never opened before get a chance to be learned. A prediction
-//! whose confidence falls below a threshold is not shown at all.
+//! knows nothing about, so files never opened before get a chance to be learned.
+//!
+//! Confidence is the share of the task's rare words that the predicted files hold, blended with
+//! the learned scores. On the benchmark tasks, predictions under 0.2 were never right, and the
+//! threshold of 0.45 keeps the shown ones to those that mostly include a right file.
 
 use std::collections::BTreeMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use wizard_core::text::keywords;
+use wizard_core::text::{keywords, stems};
 pub use wizard_learn::{DEFAULT_ALPHA, MAX_ALPHA, MIN_ALPHA};
 use wizard_learn::{FileSignal, Learn, decay};
 use wizard_store::LocatedSymbol;
 
 use crate::learned::Learned;
-use crate::query::{keyword_seeds, penalise_tests};
+use crate::query::penalise_tests;
 use crate::structure::Structure;
+use crate::vocabulary::Vocabulary;
 
 /// Share of predictions that explore a file learning knows nothing about.
 pub const EXPLORATION: f64 = 0.1;
 /// Confidence below which a prediction is not shown.
-pub const CONFIDENCE_THRESHOLD: f64 = 0.3;
+pub const CONFIDENCE_THRESHOLD: f64 = 0.45;
 /// Number of files a prediction holds.
 pub const PREDICTED_FILES: usize = 5;
 
@@ -37,6 +42,7 @@ const NOISE_PENALTY: f64 = 0.2;
 const PIVOT_BONUS: f64 = 0.5;
 const LEARNED_SEED_WEIGHT: f64 = 2.0;
 const MAX_LINES: usize = 3;
+const MAX_SEEDS: usize = 30;
 
 /// Settings of a prediction.
 #[derive(Debug, Clone, PartialEq)]
@@ -77,7 +83,7 @@ pub struct PredictedFile {
 pub struct Prediction {
     /// Predicted files, best first.
     pub files: Vec<PredictedFile>,
-    /// Mean score of the predicted files, between 0 and 1.
+    /// How likely the prediction is right, between 0 and 1.
     pub confidence: f64,
 }
 
@@ -94,6 +100,8 @@ impl Prediction {
 pub struct PredictInput<'a> {
     /// File graph of the project.
     pub structure: &'a Structure,
+    /// Words of each file of the structure.
+    pub vocabulary: &'a Vocabulary,
     /// Definitions whose name contains a keyword of the prompt.
     pub matches: &'a [LocatedSymbol],
     /// Learning store of the project, when it has one.
@@ -120,7 +128,16 @@ pub fn predict(input: &PredictInput<'_>, options: &PredictOptions) -> Prediction
         .unwrap_or_default();
     let structure = input.structure;
     let keywords = keywords(input.prompt);
-    let (mut seeds, matches) = keyword_seeds(&structure.paths, input.matches, &keywords);
+    let words = stems(input.prompt);
+    let mut seeds = word_seeds(input.vocabulary, input.prompt);
+    let mut matches: BTreeMap<usize, Vec<&LocatedSymbol>> = BTreeMap::new();
+    for located in input.matches {
+        if let Some(node) = structure.position(&located.path)
+            && Vocabulary::relates(&located.symbol.name, &words)
+        {
+            matches.entry(node).or_default().push(located);
+        }
+    }
     for (path, score) in &learned_files {
         if let Some(node) = structure.position(path) {
             *seeds.entry(node).or_default() += LEARNED_SEED_WEIGHT * score;
@@ -180,8 +197,37 @@ pub fn predict(input: &PredictInput<'_>, options: &PredictOptions) -> Prediction
             explored,
         })
         .collect();
-    let confidence = mean(files.iter().map(|file| file.score));
+    let nodes: Vec<usize> = files
+        .iter()
+        .filter_map(|file| structure.position(&file.path))
+        .collect();
+    let coverage = input.vocabulary.coverage(input.prompt, &nodes);
+    let learned = mean(
+        files
+            .iter()
+            .filter_map(|file| learned_files.get(&file.path).copied()),
+    );
+    let confidence = match coverage {
+        Some(coverage) if learned_files.is_empty() => coverage,
+        Some(coverage) => alpha * coverage + (1.0 - alpha) * learned,
+        None => learned,
+    };
     Prediction { files, confidence }
+}
+
+/// Seeds of the ranking: the files whose words best match the task, scaled so the best is 1.
+fn word_seeds(vocabulary: &Vocabulary, prompt: &str) -> BTreeMap<usize, f64> {
+    let mut scored: Vec<(usize, f64)> = vocabulary.scores(prompt).into_iter().collect();
+    scored.sort_by(|left, right| right.1.total_cmp(&left.1).then(left.0.cmp(&right.0)));
+    scored.truncate(MAX_SEEDS);
+    let top = scored.first().map_or(0.0, |(_, score)| *score);
+    if top <= 0.0 {
+        return BTreeMap::new();
+    }
+    scored
+        .into_iter()
+        .map(|(node, score)| (node, score / top))
+        .collect()
 }
 
 fn narrowest_ranges(found: &[&LocatedSymbol]) -> Vec<(u32, u32)> {
@@ -295,6 +341,7 @@ mod tests {
 
     use super::{PredictInput, PredictOptions, predict};
     use crate::structure::Structure;
+    use crate::vocabulary::Vocabulary;
 
     fn symbol(path: &str, name: &str, kind: SymbolKind, line: u32) -> LocatedSymbol {
         LocatedSymbol {
@@ -335,8 +382,10 @@ mod tests {
     fn structure_alone_finds_matching_files_and_their_neighbours() {
         let symbols = symbols();
         let structure = Structure::build(&symbols);
+        let vocabulary = Vocabulary::build(&symbols, &structure.paths);
         let input = PredictInput {
             structure: &structure,
+            vocabulary: &vocabulary,
             matches: &symbols,
             learn: None,
             prompt: "the invoice total is wrong",
@@ -382,8 +431,10 @@ mod tests {
         }
         let symbols = symbols();
         let structure = Structure::build(&symbols);
+        let vocabulary = Vocabulary::build(&symbols, &structure.paths);
         let input = PredictInput {
             structure: &structure,
+            vocabulary: &vocabulary,
             matches: &symbols,
             learn: Some(&learn),
             prompt: "facture fausse",
@@ -406,8 +457,10 @@ mod tests {
     fn exploration_swaps_the_last_file_for_an_unlearned_one() {
         let symbols = symbols();
         let structure = Structure::build(&symbols);
+        let vocabulary = Vocabulary::build(&symbols, &structure.paths);
         let input = PredictInput {
             structure: &structure,
+            vocabulary: &vocabulary,
             matches: &symbols,
             learn: None,
             prompt: "invoice tax login send render export audit",

@@ -16,6 +16,7 @@ use wizard_store::{Changes, FileSymbols, Index, StoreError, SymbolKind, SymbolRe
 
 use crate::recipes::Applied;
 use crate::structure::Structure;
+use crate::vocabulary::Vocabulary;
 
 const HEAD_BYTES: usize = 256;
 
@@ -122,7 +123,9 @@ pub fn build(project: &Path, options: &BuildOptions) -> Result<BuildReport, Inde
     if recipes_changed {
         applied.mark_built(project);
     }
-    let _ = Structure::load(&mut index);
+    if let Ok(structure) = Structure::load(&mut index) {
+        let _ = Vocabulary::load(&mut index, &structure.paths);
+    }
     Ok(BuildReport {
         files: report.files.len(),
         changes,

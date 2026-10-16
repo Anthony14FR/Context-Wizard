@@ -11,3 +11,4 @@ pub mod predict;
 pub mod query;
 pub mod recipes;
 pub mod structure;
+pub mod vocabulary;

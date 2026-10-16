@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::Path;
 
-use wizard_core::text::keywords;
+use wizard_core::text::{keywords, stems};
 use wizard_git::History;
 use wizard_store::{Index, LocatedSymbol, StoreError, SymbolKind};
 
@@ -16,6 +16,7 @@ use crate::learned::Learned;
 use crate::map::{TEST_PENALTY, is_test_path};
 use crate::recipes;
 use crate::structure::lift;
+use crate::vocabulary::Vocabulary;
 
 const MAX_MATCHES: usize = 20;
 const MAX_FILES: usize = 15;
@@ -234,7 +235,24 @@ pub fn slice(
     }
     let symbols = index.symbols()?;
     let graph = FileGraph::new(&symbols, history, learned);
-    let (seeds, matches) = keyword_seeds(&graph.paths, &symbols, &keywords);
+    let vocabulary = Vocabulary::build(&symbols, &graph.paths);
+    let words = stems(task);
+    let scores = vocabulary.scores(task);
+    let top = scores.values().copied().fold(0.0, f64::max);
+    let seeds: BTreeMap<usize, f64> = scores
+        .into_iter()
+        .filter(|(_, score)| *score > 0.0)
+        .map(|(node, score)| (node, score / top))
+        .collect();
+    let mut matches: BTreeMap<usize, Vec<&LocatedSymbol>> = BTreeMap::new();
+    for located in &symbols {
+        if located.symbol.kind != SymbolKind::Reference
+            && let Some(node) = graph.position(&located.path)
+            && Vocabulary::relates(&located.symbol.name, &words)
+        {
+            matches.entry(node).or_default().push(located);
+        }
+    }
     if seeds.is_empty() {
         return Ok(format!(
             "Nothing in the index matches {}. Try other words, or `find_symbol` with a name.\n",
@@ -323,67 +341,34 @@ pub fn facts(index: &Index, project: &Path, kind: Option<&str>) -> Result<String
     Ok(text)
 }
 
-/// Divides the score of test files by the test penalty, unless the task is about tests.
+/// Divides the score of test and documentation files by the test penalty, unless the task is
+/// about tests or documentation.
 #[allow(
     clippy::cast_precision_loss,
     reason = "the penalty is a small constant"
 )]
 pub(crate) fn penalise_tests(paths: &[String], scores: &mut [f64], keywords: &[String]) {
-    let about_tests = keywords
-        .iter()
-        .any(|keyword| keyword.starts_with("test") || keyword.starts_with("spec"));
-    if about_tests {
-        return;
-    }
+    let about = |prefixes: &[&str]| {
+        keywords
+            .iter()
+            .any(|keyword| prefixes.iter().any(|prefix| keyword.starts_with(prefix)))
+    };
+    let about_tests = about(&["test", "spec"]);
+    let about_docs = about(&["doc", "readme", "changelog", "guide"]);
     for (path, score) in paths.iter().zip(scores.iter_mut()) {
-        if is_test_path(path) {
+        if (!about_tests && is_test_path(path)) || (!about_docs && is_doc_path(path)) {
             *score /= TEST_PENALTY as f64;
         }
     }
 }
 
-/// Seeds of a personalised ranking for `keywords`: files defining a matching symbol, with those
-/// symbols, and files whose path contains a keyword, which weigh twice as much.
-pub(crate) fn keyword_seeds<'a>(
-    paths: &[String],
-    symbols: &'a [LocatedSymbol],
-    keywords: &[String],
-) -> (
-    BTreeMap<usize, f64>,
-    BTreeMap<usize, Vec<&'a LocatedSymbol>>,
-) {
-    let mut seeds: BTreeMap<usize, f64> = BTreeMap::new();
-    let mut matches: BTreeMap<usize, Vec<&LocatedSymbol>> = BTreeMap::new();
-    let position = |path: &str| {
-        paths
-            .binary_search_by(|known| known.as_str().cmp(path))
-            .ok()
-    };
-    for located in symbols {
-        let Some(node) = position(&located.path) else {
-            continue;
-        };
-        if located.symbol.kind != SymbolKind::Reference
-            && keywords
-                .iter()
-                .any(|keyword| located.symbol.name.to_lowercase().contains(keyword))
-        {
-            *seeds.entry(node).or_default() += 1.0;
-            matches.entry(node).or_default().push(located);
-        }
-    }
-    for (node, path) in paths.iter().enumerate() {
-        let lower = path.to_lowercase();
-        let hits = keywords
-            .iter()
-            .filter(|keyword| lower.contains(keyword.as_str()))
-            .count();
-        if hits > 0 {
-            *seeds.entry(node).or_default() +=
-                2.0 * f64::from(u32::try_from(hits).unwrap_or(u32::MAX));
-        }
-    }
-    (seeds, matches)
+fn is_doc_path(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    [".md", ".rst", ".txt", ".adoc"]
+        .iter()
+        .any(|extension| lower.ends_with(extension))
+        || lower.starts_with("docs/")
+        || lower.contains("/docs/")
 }
 
 fn list_files(text: &mut String, title: &str, graph: &FileGraph, nodes: &BTreeSet<usize>) {

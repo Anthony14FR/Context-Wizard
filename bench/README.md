@@ -27,6 +27,8 @@ Each repository has seven `locate` tasks and three `edit` tasks, written to need
 - Token counts are the usage reported by the API for each session: input, cache reads, cache writes and output. They are exact and need no tokenizer. Most of them are Claude Code's own system prompt and tool definitions, read again at every turn, which the plugin cannot change.
 - Exploration tokens are the size of what Read, Grep, Glob and the Context Wizard tools returned, at four bytes per token. They are what the plugin aims to reduce.
 - In plugin mode, the Context Wizard MCP tools are allowed like the built-in read-only tools, as the plugin allows them when a project is enabled.
+- Plugin mode runs `cold` by default: what earlier sessions taught is forgotten before each session, so every task measures the plugin on its own. `--learning warm` keeps learning across sessions, as in daily use, where later sessions benefit from earlier ones.
+- `python bench/eval_predictions.py --wizard <binary>` grades the files predicted for each locate task against its expected files, with no Claude session, to tune predictions before a campaign.
 - Each task runs three times per mode, and the report uses medians.
 - User-level plugins and settings of the machine running the benchmark load in both modes alike.
 
