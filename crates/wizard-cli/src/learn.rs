@@ -1,6 +1,6 @@
 //! Recording of hook events into the learning store of an enabled project.
 //!
-//! Each `Stop` also consolidates its session into learning signals.
+//! Each `Stop` also consolidates its session into learning signals and grades its predictions.
 
 use std::path::{Component, Path};
 
@@ -18,8 +18,8 @@ pub(crate) fn record(project: &Path, event: &Event) {
         && let Ok(mut learn) = Learn::open_project(project)
     {
         let _ = learn.record(&learned);
-        if learned.kind == EventKind::Stop {
-            let _ = learn.consolidate(&learned.session);
+        if learned.kind == EventKind::Stop && learn.consolidate(&learned.session).is_ok() {
+            let _ = learn.evaluate(&learned.session, learned.at);
         }
     }
 }

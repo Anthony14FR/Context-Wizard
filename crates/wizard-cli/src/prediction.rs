@@ -6,7 +6,7 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use wizard_core::text::keywords;
-use wizard_index::predict::{PredictInput, PredictOptions, Prediction, predict};
+use wizard_index::predict::{DEFAULT_ALPHA, PredictInput, PredictOptions, Prediction, predict};
 use wizard_index::structure::Structure;
 use wizard_learn::{Learn, StoredPrediction, now};
 use wizard_store::Index;
@@ -29,7 +29,13 @@ pub(crate) fn inject(project: &Path, event: &Event) -> Option<String> {
         .ok()?;
     let mut learn = Learn::open_project(project).ok();
     let session = event.session_id.as_deref().filter(|id| !id.is_empty());
-    let options = PredictOptions::default();
+    let options = PredictOptions {
+        alpha: learn
+            .as_ref()
+            .and_then(|learn| learn.alpha().ok())
+            .unwrap_or(DEFAULT_ALPHA),
+        ..PredictOptions::default()
+    };
     let at = now();
     let prediction = predict(
         &PredictInput {
