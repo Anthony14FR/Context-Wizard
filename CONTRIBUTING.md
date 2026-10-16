@@ -145,6 +145,7 @@ Under 100 lines of in-house code is preferred over a new transitive dependency t
 - Do not commit personal editor or tool configuration files, notes or session logs.
 - Do not commit generated files, except `Cargo.lock`.
 - Never commit secrets, tokens or personal data, in code, fixtures or history.
+- Do not push to the `directory` branch. A workflow rebuilds it from `plugin/` on every push to `main`, with the plugin at its root and no `.gitattributes`, because Anthropic's plugin directory refuses attributes that rewrite file contents and hook paths outside the plugin root in a subfolder.
 
 ## License
 
