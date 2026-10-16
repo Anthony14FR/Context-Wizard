@@ -109,6 +109,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -169,3 +170,6 @@ jobs:
           fi
           gh release create "v$VERSION" dist/* --verify-tag "${channel[@]}" --title "v$VERSION" --notes "See CHANGELOG.md for the changes in this release."
           git push origin "HEAD:$GITHUB_REF_NAME"
+          if [ "$GITHUB_REF_NAME" = "${{ github.event.repository.default_branch }}" ]; then
+            gh workflow run directory.yml --ref "$GITHUB_REF_NAME"
+          fi
