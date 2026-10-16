@@ -15,6 +15,7 @@ use std::collections::BTreeMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use wizard_core::text::keywords;
+pub use wizard_learn::{DEFAULT_ALPHA, MAX_ALPHA, MIN_ALPHA};
 use wizard_learn::{FileSignal, Learn, decay};
 use wizard_store::LocatedSymbol;
 
@@ -22,12 +23,6 @@ use crate::learned::Learned;
 use crate::query::{keyword_seeds, penalise_tests};
 use crate::structure::Structure;
 
-/// Lowest weight of the structural part.
-pub const MIN_ALPHA: f64 = 0.5;
-/// Highest weight of the structural part.
-pub const MAX_ALPHA: f64 = 0.9;
-/// Weight of the structural part before self-evaluation adjusts it.
-pub const DEFAULT_ALPHA: f64 = 0.7;
 /// Share of predictions that explore a file learning knows nothing about.
 pub const EXPLORATION: f64 = 0.1;
 /// Confidence below which a prediction is not shown.

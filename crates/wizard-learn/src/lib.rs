@@ -20,11 +20,15 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use rusqlite::{Connection, ErrorCode, OptionalExtension, Row, TransactionBehavior, params};
 use wizard_store::{StoreError, data_directory};
 
+mod evaluation;
 mod glossary;
 mod predictions;
 mod signals;
 mod tasks;
 
+pub use evaluation::{
+    DEFAULT_ALPHA, Evaluation, MAX_ALPHA, MIN_ALPHA, ROLLING_WINDOW, precision_at_k,
+};
 pub use glossary::{GLOSSARY_MIN_SESSIONS, GlossaryEntry};
 pub use predictions::StoredPrediction;
 pub use signals::{
@@ -36,12 +40,12 @@ pub use tasks::{SIMILAR_SESSIONS, SimilarSession, TaskFile, bm25};
 pub const LEARN_FILE: &str = "learn.db";
 
 /// Version of the learning store schema written by this build.
-pub const SCHEMA_VERSION: i64 = 3;
+pub const SCHEMA_VERSION: i64 = 4;
 
 const OPEN_ATTEMPTS: u32 = 50;
 const OPEN_BACKOFF: Duration = Duration::from_millis(20);
 
-const MIGRATIONS: [&str; 3] = [
+const MIGRATIONS: [&str; 4] = [
     "
     CREATE TABLE sessions (
         id TEXT PRIMARY KEY NOT NULL,
@@ -92,6 +96,19 @@ const MIGRATIONS: [&str; 3] = [
         shown INTEGER NOT NULL
     ) STRICT;
     CREATE INDEX predictions_by_session ON predictions (session, id);
+",
+    "
+    CREATE TABLE evaluations (
+        session TEXT PRIMARY KEY NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+        at INTEGER NOT NULL,
+        precision REAL NOT NULL,
+        predictions INTEGER NOT NULL,
+        alpha REAL NOT NULL
+    ) STRICT;
+    CREATE TABLE settings (
+        key TEXT PRIMARY KEY NOT NULL,
+        value REAL NOT NULL
+    ) STRICT;
 ",
 ];
 
