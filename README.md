@@ -9,6 +9,7 @@ Context Wizard gives Claude Code the right codebase context at the right time, f
 - **Predicted files at each prompt.** The five files a task most likely needs, with line ranges, shown only when the prediction is confident.
 - **MCP tools.** `overview`, `map`, `find_symbol`, `refs`, `exact_refs`, `slice`, `impact`, `explain` and `facts` answer structural questions from a local index kept fresh before each answer.
 - **Learning.** Each session teaches which files were useful for which kind of task, and predictions grade themselves.
+- **Focused reads and shorter outputs.** A full read of a file of more than 400 lines is narrowed to the part the task is about, with the file's outline, and command outputs of more than 200 lines keep their errors, failures, warnings, first and last lines. Claude is told each time, and can read or rerun for more.
 - **Framework recipes** for Laravel, React, Next and Expo, and exact references from a language server when one is installed.
 
 Commands: `/context-wizard:on`, `/context-wizard:off`, `/context-wizard:status`, `/context-wizard:stats` and `/context-wizard:purge`.
