@@ -12,7 +12,7 @@ Prefer the Context Wizard MCP tools to Grep, Glob and bulk Read when the questio
 | Question | Tool |
 | --- | --- |
 | Where is `name` defined? | `find_symbol` with the name |
-| Where is `name` used, before renaming or changing its signature? | `refs` with the name |
+| Where is `name` used, before renaming or changing its signature? | `refs` with the name, or `exact_refs` when unrelated symbols share the name |
 | Which files matter for this task? | `slice` with the task in a few specific words |
 | What does this file contain, without reading all of it? | `explain` with the path |
 | What could break if I change this file? | `impact` with the path |

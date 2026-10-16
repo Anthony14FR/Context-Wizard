@@ -121,6 +121,7 @@ fn serves_the_tools_of_an_enabled_project() {
     assert_eq!(
         names,
         [
+            "exact_refs",
             "explain",
             "facts",
             "find_symbol",
