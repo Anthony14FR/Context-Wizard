@@ -63,6 +63,12 @@ impl Applied {
         Self::detect(project, &scan(project, &ScanOptions::default()).files)
     }
 
+    /// Compiles every query of the loaded recipes and adds their problems to [`Applied::errors`].
+    pub fn check(&mut self) {
+        let problems: Vec<RecipeError> = self.recipes.iter().flat_map(Recipe::check).collect();
+        self.errors.extend(problems);
+    }
+
     /// Names of every loaded recipe with the names of its extractions.
     #[must_use]
     pub fn loaded(&self) -> Vec<(String, Vec<String>)> {

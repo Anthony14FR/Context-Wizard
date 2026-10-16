@@ -10,13 +10,15 @@
 //! `.claude/context-wizard/recipes/<name>/`. They are read again at every index refresh, so an
 //! edited recipe applies without restarting anything. Every recipe is validated as a whole:
 //! unknown fields, invalid globs, queries that do not compile and template placeholders that
-//! nothing provides are reported with the recipe, the extract and the field at fault.
+//! nothing provides are reported with the recipe, the extract and the field at fault. Queries
+//! compile the first time a file needs them, and [`Recipe::check`] compiles them all.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use regex::Regex;
@@ -120,9 +122,31 @@ pub struct Extract {
     pub title: String,
     include: GlobSet,
     exclude: GlobSet,
-    query: Option<(String, Query)>,
+    query: Option<LazyQuery>,
     path_pattern: Option<Regex>,
     template: Vec<Piece>,
+}
+
+/// A query file, compiled the first time a file needs it.
+#[derive(Debug)]
+struct LazyQuery {
+    file: String,
+    language: String,
+    source: String,
+    compiled: OnceLock<Result<Query, String>>,
+}
+
+impl LazyQuery {
+    fn compiled(&self) -> Result<&Query, &String> {
+        self.compiled
+            .get_or_init(|| {
+                let grammar = wizard_parse::grammar::language(&self.language)
+                    .map_err(|problem| format!("`{}` is unavailable: {problem}", self.language))?;
+                Query::new(&grammar, &self.source)
+                    .map_err(|problem| format!("`{}` does not compile: {problem}", self.file))
+            })
+            .as_ref()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -229,6 +253,24 @@ impl Recipe {
         Self::parse(&label, &text, &read_query)
     }
 
+    /// Compiles every query of the recipe and reports those that fail, which loading alone does
+    /// not, so that loading stays cheap enough for every index refresh.
+    #[must_use]
+    pub fn check(&self) -> Vec<RecipeError> {
+        self.extracts
+            .iter()
+            .filter_map(|extract| {
+                let lazy = extract.query.as_ref()?;
+                let problem = lazy.compiled().err()?;
+                Some(RecipeError {
+                    recipe: self.name.clone(),
+                    location: format!("extract \"{}\", query", extract.name),
+                    message: problem.clone(),
+                })
+            })
+            .collect()
+    }
+
     /// Returns `true` when the project rooted at `root` uses the recipe's framework.
     #[must_use]
     pub fn detects(&self, root: &Path) -> bool {
@@ -290,10 +332,13 @@ impl Extract {
                 }
             }
         }
-        let Some((language, query)) = &self.query else {
+        let Some(lazy) = &self.query else {
             return vec![(1, base)];
         };
-        let Ok(grammar) = wizard_parse::grammar::language(language) else {
+        let Ok(query) = lazy.compiled() else {
+            return Vec::new();
+        };
+        let Ok(grammar) = wizard_parse::grammar::language(&lazy.language) else {
             return Vec::new();
         };
         let mut parser = Parser::new();
@@ -422,7 +467,7 @@ fn build_extract(
         errors.push(("glob", "needs at least one pattern".to_owned()));
     }
     let mut provided: BTreeSet<String> = BTreeSet::from(["file".to_owned()]);
-    let query = compile_query(
+    let query = read_query_file(
         extract.query.as_ref(),
         extract.language.as_ref(),
         read_query,
@@ -484,45 +529,27 @@ fn build_extract(
     })
 }
 
-fn compile_query(
+fn read_query_file(
     query: Option<&String>,
     language: Option<&String>,
     read_query: &dyn Fn(&str) -> Option<String>,
     provided: &mut BTreeSet<String>,
     errors: &mut Vec<(&'static str, String)>,
-) -> Option<(String, Query)> {
+) -> Option<LazyQuery> {
     match (query, language) {
-        (Some(file), Some(language)) => match read_query(file) {
-            None => {
+        (Some(file), Some(language)) => {
+            let Some(source) = read_query(file) else {
                 errors.push(("query", format!("file `{file}` cannot be read")));
-                None
-            }
-            Some(source) => match wizard_parse::grammar::language(language) {
-                Err(problem) => {
-                    errors.push((
-                        "language",
-                        format!("`{language}` is unavailable: {problem}"),
-                    ));
-                    None
-                }
-                Ok(grammar) => match Query::new(&grammar, &source) {
-                    Err(problem) => {
-                        errors.push(("query", format!("`{file}` does not compile: {problem}")));
-                        None
-                    }
-                    Ok(query) => {
-                        provided.extend(
-                            query
-                                .capture_names()
-                                .iter()
-                                .filter(|name| !name.starts_with('_'))
-                                .map(|name| (*name).to_owned()),
-                        );
-                        Some((language.clone(), query))
-                    }
-                },
-            },
-        },
+                return None;
+            };
+            provided.extend(capture_names(&source));
+            Some(LazyQuery {
+                file: file.clone(),
+                language: language.clone(),
+                source,
+                compiled: OnceLock::new(),
+            })
+        }
         (Some(_), None) => {
             errors.push(("language", "is required with `query`".to_owned()));
             None
@@ -533,6 +560,22 @@ fn compile_query(
         }
         (None, None) => None,
     }
+}
+
+fn capture_names(source: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut rest = source;
+    while let Some(at) = rest.find('@') {
+        rest = &rest[at + 1..];
+        let name: String = rest
+            .chars()
+            .take_while(|character| character.is_alphanumeric() || "_.-".contains(*character))
+            .collect();
+        if !name.is_empty() && !name.starts_with('_') {
+            names.push(name);
+        }
+    }
+    names
 }
 
 fn globs(

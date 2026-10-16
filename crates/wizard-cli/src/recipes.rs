@@ -14,7 +14,8 @@ use wizard_recipes::PROJECT_RECIPES;
     reason = "the recipes command reports broken recipes to their author"
 )]
 pub(crate) fn run(project: &Path) -> ExitCode {
-    let applied = Applied::detect_project(project);
+    let mut applied = Applied::detect_project(project);
+    applied.check();
     print!("{}", report(project, &applied));
     if applied.errors.is_empty() {
         ExitCode::SUCCESS
