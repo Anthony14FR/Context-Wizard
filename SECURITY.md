@@ -29,6 +29,9 @@ Context Wizard runs locally inside Claude Code. The most relevant areas are:
 - the binary bootstrap: download, SHA-256 verification and installation,
 - secret filtering: keeping credentials and `.env` values out of the context sent to Claude,
 - parsing of untrusted project files, recipes and configuration,
-- the local socket between hooks and the index server.
+- the local data written in `.wizard/` and `.claude/`,
+- the language servers started for exact references.
+
+The [threat model](docs/threat-model.md) describes the assets, trust boundaries and mitigations.
 
 Vulnerabilities in Claude Code itself should be reported to Anthropic, not to this project.

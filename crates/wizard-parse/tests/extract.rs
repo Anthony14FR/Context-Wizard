@@ -87,3 +87,11 @@ fn typescript_files_get_their_functions_and_classes() {
         );
     }
 }
+
+proptest::proptest! {
+    #[test]
+    fn lexical_extraction_never_panics(path in proptest::prelude::any::<String>(), content in proptest::prelude::any::<String>()) {
+        let _ = wizard_parse::lexical::extract(&path, &content);
+        let _ = wizard_parse::detect_language(&path, &content);
+    }
+}
