@@ -14,6 +14,7 @@ serde_json.workspace = true
 wizard-budget.workspace = true
 wizard-core.workspace = true
 wizard-git.workspace = true
+wizard-learn.workspace = true
 wizard-graph.workspace = true
 wizard-parse.workspace = true
 wizard-scan.workspace = true

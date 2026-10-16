@@ -2,7 +2,8 @@
 //!
 //! Each file is a node. A reference to a name adds an edge from the referring file to every
 //! file defining that name, weighted by one over the number of definers. Files that changed
-//! together in recent commits are linked both ways, weighted by how often that happened.
+//! together in recent commits, or that past sessions touched together, are linked both ways,
+//! weighted by how often that happened and, for sessions, by how recently.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -10,7 +11,10 @@ use wizard_git::History;
 use wizard_graph::{Graph, GraphBuilder, PageRankOptions, pagerank};
 use wizard_store::{LocatedSymbol, SymbolKind};
 
+use crate::learned::Learned;
+
 const CO_CHANGE_WEIGHT: f64 = 0.5;
+const CO_ACCESS_WEIGHT: f64 = 0.5;
 
 /// Files of the project with the graph linking them.
 #[derive(Debug, Clone)]
@@ -26,9 +30,10 @@ pub struct FileGraph {
 }
 
 impl FileGraph {
-    /// Builds the graph from the stored symbols and, when available, the git history.
+    /// Builds the graph from the stored symbols, the git history when available, and what past
+    /// sessions learned.
     #[must_use]
-    pub fn new(symbols: &[LocatedSymbol], history: Option<&History>) -> Self {
+    pub fn new(symbols: &[LocatedSymbol], history: Option<&History>, learned: &Learned) -> Self {
         let paths: Vec<String> = symbols
             .iter()
             .map(|located| located.path.clone())
@@ -76,6 +81,16 @@ impl FileGraph {
                     builder.add_edge(left, right, weight);
                     builder.add_edge(right, left, weight);
                 }
+            }
+        }
+        for pair in &learned.co_access {
+            if let (Some(&first), Some(&second)) = (
+                index.get(pair.first.as_str()),
+                index.get(pair.second.as_str()),
+            ) {
+                let weight = CO_ACCESS_WEIGHT * pair.weight;
+                builder.add_edge(first, second, weight);
+                builder.add_edge(second, first, weight);
             }
         }
         Self {
