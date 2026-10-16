@@ -4,6 +4,8 @@ use rusqlite::{TransactionBehavior, params};
 
 use crate::{Index, StoreError};
 
+const NAMES_PER_QUERY: usize = 500;
+
 /// What a stored symbol is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SymbolKind {
@@ -104,6 +106,9 @@ impl Index {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if !files.is_empty() {
+            transaction.execute("DELETE FROM cache", [])?;
+        }
         {
             let mut language =
                 transaction.prepare("UPDATE files SET language = ?2 WHERE path = ?1")?;
@@ -188,6 +193,25 @@ impl Index {
              WHERE name = ?1",
             [name],
         )
+    }
+
+    /// Returns the symbols other than references named one of `names`, sorted by path and line.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the database cannot be queried.
+    pub fn definitions_named(&self, names: &[&str]) -> Result<Vec<LocatedSymbol>, StoreError> {
+        let mut symbols = Vec::new();
+        for chunk in names.chunks(NAMES_PER_QUERY) {
+            let placeholders = vec!["?"; chunk.len()].join(", ");
+            let sql = format!(
+                "SELECT path, kind, name, role, line, end_line, signature, count FROM symbols
+                 WHERE kind != 'reference' AND name IN ({placeholders})"
+            );
+            symbols.extend(self.query_symbols(&sql, rusqlite::params_from_iter(chunk))?);
+        }
+        symbols.sort_unstable();
+        Ok(symbols)
     }
 
     fn query_symbols<P: rusqlite::Params>(

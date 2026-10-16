@@ -19,7 +19,7 @@ pub const L1_BUDGET: u64 = 4_000;
 
 const MAX_DEFINITIONS_PER_FILE: usize = 30;
 const POINT: usize = 1_000;
-const TEST_PENALTY: usize = 10;
+pub(crate) const TEST_PENALTY: usize = 10;
 const HEADER: &str = "# Repository map (Context Wizard)\nDefinitions ranked by how many other files use them, with line numbers.\n";
 
 struct RankedFile<'a> {
@@ -126,7 +126,7 @@ fn render(files: &[RankedFile<'_>], budget: u64) -> String {
     text
 }
 
-fn is_test_path(path: &str) -> bool {
+pub(crate) fn is_test_path(path: &str) -> bool {
     let lower = path.to_ascii_lowercase();
     let name = lower.rsplit('/').next().unwrap_or(&lower);
     let in_test_folder = lower.split('/').rev().skip(1).any(|segment| {

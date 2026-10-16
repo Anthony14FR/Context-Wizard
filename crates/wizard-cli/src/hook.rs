@@ -17,6 +17,7 @@ use crate::grep;
 use crate::install;
 use crate::learn;
 use crate::opt_in;
+use crate::prediction;
 use crate::update;
 
 const MAX_INPUT_BYTES: u64 = 8 * 1024 * 1024;
@@ -75,6 +76,12 @@ fn respond(event: &Event) -> Option<String> {
             let pattern = event.tool_input.as_ref()?.get("pattern")?.as_str()?;
             let text = grep::known_symbol(&project, pattern)?;
             Some(additional_context("PreToolUse", &text))
+        }
+        State::Decided(decision)
+            if decision.enabled && event.hook_event_name == EventName::UserPromptSubmit =>
+        {
+            let text = prediction::inject(&project, event)?;
+            Some(additional_context("UserPromptSubmit", &text))
         }
         State::Undecided if event.hook_event_name == EventName::UserPromptSubmit => {
             let binary = env::current_exe().ok()?;

@@ -1,10 +1,11 @@
 //! Prediction of the files a task needs.
 //!
-//! Each file gets `score = Î± Â· structural + (1 âˆ’ Î±) Â· learned`. The structural part is a
-//! personalised `PageRank` seeded by the task's keywords and by learned files. The learned part
+//! Each file gets `score = α · structural + (1 − α) · learned`. The structural part is the lift
+//! of a personalised `PageRank` seeded by the task's keywords and by learned files, with tests
+//! ranked after production code unless the task is about tests. The learned part
 //! combines the files of similar past sessions, the domain glossary and each file's own history
 //! of useful and noisy reads, all faded with a 30-day half-life. Both parts are scaled to 1 for
-//! the best file, and Î± stays between 0.5 and 0.9 so the structure of the code always counts.
+//! the best file, and α stays between 0.5 and 0.9 so the structure of the code always counts.
 //!
 //! One prediction in ten swaps its last file for the best structural candidate that learning
 //! knows nothing about, so files never opened before get a chance to be learned. A prediction
@@ -14,13 +15,12 @@ use std::collections::BTreeMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use wizard_core::text::keywords;
-use wizard_git::History;
 use wizard_learn::{FileSignal, Learn, decay};
 use wizard_store::LocatedSymbol;
 
-use crate::graph::FileGraph;
 use crate::learned::Learned;
-use crate::query::keyword_seeds;
+use crate::query::{keyword_seeds, penalise_tests};
+use crate::structure::Structure;
 
 /// Lowest weight of the structural part.
 pub const MIN_ALPHA: f64 = 0.5;
@@ -71,7 +71,7 @@ pub struct PredictedFile {
     pub path: String,
     /// Combined score, between 0 and 1.
     pub score: f64,
-    /// First and last lines of the definitions matching the task, at most three.
+    /// First and last lines of the narrowest definitions matching the task, at most three.
     pub lines: Vec<(u32, u32)>,
     /// Whether the file was chosen to explore rather than for its score.
     pub explored: bool,
@@ -97,16 +97,16 @@ impl Prediction {
 /// What a prediction is computed from.
 #[derive(Debug, Clone, Copy)]
 pub struct PredictInput<'a> {
-    /// Symbols of the index.
-    pub symbols: &'a [LocatedSymbol],
+    /// File graph of the project.
+    pub structure: &'a Structure,
+    /// Definitions whose name contains a keyword of the prompt.
+    pub matches: &'a [LocatedSymbol],
     /// Learning store of the project, when it has one.
     pub learn: Option<&'a Learn>,
     /// The task, as the user wrote it.
     pub prompt: &'a str,
     /// Current session, left out of the past sessions.
     pub session: Option<&'a str>,
-    /// Git history, when available.
-    pub history: Option<&'a History>,
     /// Current time in milliseconds since the Unix epoch.
     pub now: i64,
 }
@@ -123,11 +123,11 @@ pub fn predict(input: &PredictInput<'_>, options: &PredictOptions) -> Prediction
         .learn
         .and_then(|learn| Learned::from_store(learn, input.now))
         .unwrap_or_default();
-    let graph = FileGraph::new(input.symbols, input.history, &learned_graph);
+    let structure = input.structure;
     let keywords = keywords(input.prompt);
-    let (mut seeds, matches) = keyword_seeds(&graph, input.symbols, &keywords);
+    let (mut seeds, matches) = keyword_seeds(&structure.paths, input.matches, &keywords);
     for (path, score) in &learned_files {
-        if let Some(node) = graph.position(path) {
+        if let Some(node) = structure.position(path) {
             *seeds.entry(node).or_default() += LEARNED_SEED_WEIGHT * score;
         }
     }
@@ -135,12 +135,14 @@ pub fn predict(input: &PredictInput<'_>, options: &PredictOptions) -> Prediction
         return Prediction::default();
     }
     let structural: Vec<f64> = if seeds.is_empty() {
-        vec![0.0; graph.paths.len()]
+        vec![0.0; structure.paths.len()]
     } else {
-        scaled(&graph.rank(&seeds))
+        let mut relevance = structure.relevance(&seeds, &learned_graph.co_access);
+        penalise_tests(&structure.paths, &mut relevance, &keywords);
+        scaled(&relevance)
     };
     let mut scores: BTreeMap<&str, (f64, f64)> = BTreeMap::new();
-    for (node, path) in graph.paths.iter().enumerate() {
+    for (node, path) in structure.paths.iter().enumerate() {
         if structural[node] > 0.0 {
             scores.entry(path).or_default().0 = structural[node];
         }
@@ -175,22 +177,28 @@ pub fn predict(input: &PredictInput<'_>, options: &PredictOptions) -> Prediction
         .map(|(path, score, explored)| PredictedFile {
             path: path.to_owned(),
             score,
-            lines: graph
+            lines: structure
                 .position(path)
                 .and_then(|node| matches.get(&node))
-                .map(|found| {
-                    found
-                        .iter()
-                        .take(MAX_LINES)
-                        .map(|located| (located.symbol.line, located.symbol.end_line))
-                        .collect()
-                })
+                .map(|found| narrowest_ranges(found))
                 .unwrap_or_default(),
             explored,
         })
         .collect();
     let confidence = mean(files.iter().map(|file| file.score));
     Prediction { files, confidence }
+}
+
+fn narrowest_ranges(found: &[&LocatedSymbol]) -> Vec<(u32, u32)> {
+    let mut ranges: Vec<(u32, u32)> = found
+        .iter()
+        .map(|located| (located.symbol.line, located.symbol.end_line))
+        .collect();
+    ranges.sort_by_key(|(start, end)| (end.saturating_sub(*start), *start));
+    ranges.dedup();
+    ranges.truncate(MAX_LINES);
+    ranges.sort_unstable();
+    ranges
 }
 
 fn learned_scores(
@@ -291,6 +299,7 @@ mod tests {
     use wizard_store::{LocatedSymbol, SymbolKind, SymbolRecord};
 
     use super::{PredictInput, PredictOptions, predict};
+    use crate::structure::Structure;
 
     fn symbol(path: &str, name: &str, kind: SymbolKind, line: u32) -> LocatedSymbol {
         LocatedSymbol {
@@ -330,12 +339,13 @@ mod tests {
     #[test]
     fn structure_alone_finds_matching_files_and_their_neighbours() {
         let symbols = symbols();
+        let structure = Structure::build(&symbols);
         let input = PredictInput {
-            symbols: &symbols,
+            structure: &structure,
+            matches: &symbols,
             learn: None,
             prompt: "the invoice total is wrong",
             session: None,
-            history: None,
             now: 0,
         };
         let prediction = predict(&input, &quiet());
@@ -376,12 +386,13 @@ mod tests {
             learn.consolidate(session).unwrap();
         }
         let symbols = symbols();
+        let structure = Structure::build(&symbols);
         let input = PredictInput {
-            symbols: &symbols,
+            structure: &structure,
+            matches: &symbols,
             learn: Some(&learn),
             prompt: "facture fausse",
             session: Some("now"),
-            history: None,
             now: 3,
         };
         let prediction = predict(&input, &quiet());
@@ -399,12 +410,13 @@ mod tests {
     #[test]
     fn exploration_swaps_the_last_file_for_an_unlearned_one() {
         let symbols = symbols();
+        let structure = Structure::build(&symbols);
         let input = PredictInput {
-            symbols: &symbols,
+            structure: &structure,
+            matches: &symbols,
             learn: None,
             prompt: "invoice tax login send render export audit",
             session: None,
-            history: None,
             now: 0,
         };
         let always = PredictOptions {
