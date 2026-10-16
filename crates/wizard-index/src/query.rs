@@ -392,6 +392,7 @@ fn describe(located: &LocatedSymbol) -> String {
         SymbolKind::Heading | SymbolKind::Key => symbol.name.clone(),
         SymbolKind::Identifier => format!("{} ({} uses)", symbol.name, symbol.count),
         SymbolKind::Fact => format!("{} ({})", symbol.name, symbol.role),
+        SymbolKind::Doc => format!("{}: {}", symbol.role, symbol.name),
     }
 }
 

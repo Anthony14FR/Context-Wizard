@@ -13,7 +13,7 @@
 //!
 //! Confidence is the share of the task's rare words that the predicted files hold, blended with
 //! the learned scores. On the benchmark tasks, predictions under 0.2 were never right, and the
-//! threshold of 0.45 keeps the shown ones to those that mostly include a right file.
+//! threshold of 0.55 keeps the shown ones to those where about half the files are right.
 
 use std::collections::BTreeMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -31,7 +31,7 @@ use crate::vocabulary::Vocabulary;
 /// Share of predictions that explore a file learning knows nothing about.
 pub const EXPLORATION: f64 = 0.1;
 /// Confidence below which a prediction is not shown.
-pub const CONFIDENCE_THRESHOLD: f64 = 0.45;
+pub const CONFIDENCE_THRESHOLD: f64 = 0.55;
 /// Number of files a prediction holds.
 pub const PREDICTED_FILES: usize = 5;
 

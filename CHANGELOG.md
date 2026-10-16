@@ -2,6 +2,19 @@
 
 All notable changes to Context Wizard are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-16
+
+### Added
+
+- Focused reads: a read of a file of more than 400 lines without a range is narrowed to the definitions matching the session's task, with the file's outline beside it. Without a clear match the read is left whole.
+- Shorter command outputs: Bash outputs of more than 200 lines keep their first and last lines and every error, failure and warning with the lines around them, with a note of what was left out.
+- The first sentence of the comment documenting each definition, Python docstrings included, is indexed, shown in the outlines of `explain`, and used to rank files.
+
+### Changed
+
+- Files are also ranked by the names they use. On the benchmark's locate tasks, recall of the predicted files rose from 19% to 25%, and predictions are shown only when about half of their files are right (47% when shown, 85% with at least one right file).
+- The index schema moves to version 4 and is rebuilt once to pick up documentation.
+
 ## [0.2.0] - 2026-10-16
 
 ### Changed
@@ -56,5 +69,6 @@ First public release.
 - `wizard calibrate` measures token ratios with Anthropic's `count_tokens` endpoint, on request only.
 - Property-based fuzzing of every parser of untrusted input, and a threat model.
 
+[0.3.0]: https://github.com/Anthony14FR/Context-Wizard/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Anthony14FR/Context-Wizard/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Anthony14FR/Context-Wizard/releases/tag/v0.1.0

@@ -150,7 +150,7 @@ pub fn extract_file(path: &str, content: &str) -> (FileSymbols, bool) {
     let tags = language.and_then(|language| extract::extract(language, content).ok());
     let tagged = tags.as_ref().is_some_and(|tags| !tags.is_empty());
     let symbols = match tags {
-        Some(tags) if tagged => tags.into_iter().map(from_tag).collect(),
+        Some(tags) if tagged => tags.into_iter().flat_map(from_tag).collect(),
         _ => lexical::extract(path, content)
             .into_iter()
             .map(|entry| from_entry(&entry))
@@ -166,8 +166,17 @@ pub fn extract_file(path: &str, content: &str) -> (FileSymbols, bool) {
     )
 }
 
-fn from_tag(tag: Tag) -> SymbolRecord {
-    SymbolRecord {
+fn from_tag(tag: Tag) -> Vec<SymbolRecord> {
+    let doc = (!tag.doc.is_empty()).then(|| SymbolRecord {
+        line: tag.line,
+        kind: SymbolKind::Doc,
+        name: secrets::redact(&tag.doc).into_owned(),
+        role: secrets::redact(&tag.name).into_owned(),
+        end_line: tag.line,
+        signature: String::new(),
+        count: 1,
+    });
+    let symbol = SymbolRecord {
         line: tag.line,
         kind: match tag.kind {
             TagKind::Definition => SymbolKind::Definition,
@@ -178,7 +187,8 @@ fn from_tag(tag: Tag) -> SymbolRecord {
         end_line: tag.end_line,
         signature: secrets::redact(&tag.signature).into_owned(),
         count: 1,
-    }
+    };
+    std::iter::once(symbol).chain(doc).collect()
 }
 
 fn from_entry(entry: &Entry) -> SymbolRecord {

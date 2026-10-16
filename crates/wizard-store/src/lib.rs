@@ -22,7 +22,7 @@ mod symbols;
 pub use symbols::{FileRecord, FileSymbols, LocatedSymbol, SymbolKind, SymbolRecord};
 
 /// Version of the index schema. A different version on disk triggers a rebuild.
-pub const SCHEMA_VERSION: i64 = 3;
+pub const SCHEMA_VERSION: i64 = 4;
 
 /// Directory holding Context Wizard data, relative to the project root.
 pub const DATA_DIRECTORY: &str = ".wizard";

@@ -130,7 +130,9 @@ fn clean_text(text: &str) -> String {
     redacted.chars().take(MAX_TEXT_CHARS).collect()
 }
 
-fn relative(project: &Path, raw: &str) -> Option<String> {
+/// `raw`, an absolute or project-relative path, relative to `project` with `/` separators, or
+/// `None` when it is outside the project.
+pub(crate) fn relative(project: &Path, raw: &str) -> Option<String> {
     let path = Path::new(raw);
     let absolute = if path.is_absolute() {
         path.to_path_buf()
