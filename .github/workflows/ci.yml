@@ -94,7 +94,7 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo build --release --locked -p wizard-cli
-      - run: .github/scripts/upgrade.sh "${{ matrix.target }}" target/release/wizard
+      - run: sh .github/scripts/upgrade.sh "${{ matrix.target }}" target/release/wizard
         env:
           GH_TOKEN: ${{ github.token }}
 
