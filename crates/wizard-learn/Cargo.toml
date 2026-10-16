@@ -10,6 +10,7 @@ publish.workspace = true
 
 [dependencies]
 rusqlite.workspace = true
+wizard-core.workspace = true
 wizard-store.workspace = true
 
 [dev-dependencies]

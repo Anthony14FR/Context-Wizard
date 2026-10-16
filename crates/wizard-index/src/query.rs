@@ -6,6 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
+use wizard_core::text::keywords;
 use wizard_git::History;
 use wizard_store::{Index, LocatedSymbol, StoreError, SymbolKind};
 
@@ -16,11 +17,6 @@ const MAX_MATCHES: usize = 20;
 const MAX_FILES: usize = 15;
 const MAX_LINES_PER_FILE: usize = 12;
 const MAX_SLICE_FILES: usize = 10;
-const MIN_KEYWORD_LENGTH: usize = 3;
-const STOP_WORDS: [&str; 20] = [
-    "the", "and", "for", "with", "that", "this", "from", "into", "when", "where", "what", "add",
-    "fix", "make", "use", "new", "all", "how", "should", "does",
-];
 
 /// Definitions named `name`, or, when none matches exactly, definitions whose name contains it.
 ///
@@ -283,37 +279,6 @@ pub fn slice(
     Ok(text)
 }
 
-fn keywords(task: &str) -> Vec<String> {
-    let mut words: BTreeSet<String> = BTreeSet::new();
-    for word in task.split(|character: char| !character.is_alphanumeric()) {
-        for part in split_identifier(word) {
-            let lower = part.to_lowercase();
-            if lower.chars().count() >= MIN_KEYWORD_LENGTH && !STOP_WORDS.contains(&lower.as_str())
-            {
-                words.insert(lower);
-            }
-        }
-    }
-    words.into_iter().collect()
-}
-
-fn split_identifier(word: &str) -> Vec<String> {
-    let mut parts = vec![word.to_owned()];
-    let mut current = String::new();
-    let mut previous_lower = false;
-    for character in word.chars() {
-        if character.is_uppercase() && previous_lower && !current.is_empty() {
-            parts.push(std::mem::take(&mut current));
-        }
-        previous_lower = character.is_lowercase();
-        current.push(character);
-    }
-    if !current.is_empty() && current != word {
-        parts.push(current);
-    }
-    parts
-}
-
 fn list_files(text: &mut String, title: &str, graph: &FileGraph, nodes: &BTreeSet<usize>) {
     if nodes.is_empty() {
         return;
@@ -356,25 +321,5 @@ fn join_lines(lines: &[u32]) -> String {
 fn push_remainder(text: &mut String, total: usize, shown: usize) {
     if total > shown {
         let _ = writeln!(text, "- and {} more", total - shown);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::keywords;
-
-    #[test]
-    fn keywords_split_identifiers_and_drop_noise() {
-        assert_eq!(
-            keywords("Fix the sessionStore refresh when login fails"),
-            [
-                "fails",
-                "login",
-                "refresh",
-                "session",
-                "sessionstore",
-                "store"
-            ]
-        );
     }
 }
