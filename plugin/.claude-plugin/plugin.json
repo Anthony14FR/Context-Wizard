@@ -10,5 +10,12 @@
   "homepage": "https://github.com/Anthony14FR/Context-Wizard",
   "repository": "https://github.com/Anthony14FR/Context-Wizard",
   "license": "MIT OR Apache-2.0",
-  "keywords": ["context", "codebase", "repository-map", "tokens", "tree-sitter", "learning"]
+  "keywords": [
+    "context",
+    "codebase",
+    "repository-map",
+    "tokens",
+    "tree-sitter",
+    "learning"
+  ]
 }

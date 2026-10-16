@@ -2,11 +2,11 @@
   "version": "0.1.0",
   "url": "https://github.com/Anthony14FR/Context-Wizard/releases/download/v0.1.0",
   "sha256": {
-    "aarch64-apple-darwin": "",
-    "aarch64-pc-windows-msvc": "",
-    "aarch64-unknown-linux-musl": "",
-    "x86_64-apple-darwin": "",
-    "x86_64-pc-windows-msvc": "",
-    "x86_64-unknown-linux-musl": ""
+    "aarch64-apple-darwin": "237d27d11c92a48aacd52a2bf902dfdb30d0173c7872e6d20b29fb5b5eb6dec5",
+    "aarch64-pc-windows-msvc": "12e8abfa1e7c96db538219781e5d7f48028fb53d019707af5f6034eb5556cd20",
+    "aarch64-unknown-linux-musl": "d7c2e5c35355a17f2af2341f1cada8ede2116169d55befe7a6e7eb08ed1e7fca",
+    "x86_64-apple-darwin": "bc9a679c23629fdd1bc8d8aa60f7f009d67e0983a7adb01a0e88dbb28d0ff094",
+    "x86_64-pc-windows-msvc": "29d2ede88a3361f55410092ee66cc31138c5d1599bcdbef95f2a9d3867597b09",
+    "x86_64-unknown-linux-musl": "07cf11745840c11bd9236f2225a3028364b1c1347bd5c972d150c23b23c8bf25"
   }
 }
