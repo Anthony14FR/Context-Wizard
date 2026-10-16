@@ -215,3 +215,34 @@ fn the_worked_example_of_the_guide_works() {
         ["commands:3 app:sync-catalog -> SyncCatalogCommand"]
     );
 }
+
+#[test]
+fn project_recipes_cannot_read_files_outside_their_directory() {
+    let project = tempfile::tempdir().unwrap();
+    fs::write(project.path().join("secret.scm"), "(name) @found").unwrap();
+    let directory = project.path().join(PROJECT_RECIPES).join("escape");
+    fs::create_dir_all(&directory).unwrap();
+    for query in ["../../../secret.scm", "/etc/passwd", "C:/Windows/win.ini"] {
+        fs::write(
+            directory.join("recipe.toml"),
+            format!(
+                "name = \"escape\"
+[detect]
+files = [\"a\"]
+[[extract]]
+name = \"x\"
+glob = [\"*.php\"]
+language = \"php\"
+query = {query:?}
+template = \"{{found}}\"
+"
+            ),
+        )
+        .unwrap();
+        let errors = Recipe::load(&directory).unwrap_err();
+        assert!(
+            errors[0].message.contains("cannot be read"),
+            "{query}: {errors:?}"
+        );
+    }
+}

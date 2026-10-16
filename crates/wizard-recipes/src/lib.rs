@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 
 use globset::{Glob, GlobSet, GlobSetBuilder};
@@ -245,9 +245,11 @@ impl Recipe {
             }]
         })?;
         let read_query = |name: &str| {
-            let path = directory.join(name);
-            path.starts_with(directory)
-                .then(|| fs::read_to_string(path).ok())
+            let inside = Path::new(name)
+                .components()
+                .all(|component| matches!(component, Component::Normal(_)));
+            inside
+                .then(|| fs::read_to_string(directory.join(name)).ok())
                 .flatten()
         };
         Self::parse(&label, &text, &read_query)

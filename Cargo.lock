@@ -2245,6 +2245,7 @@ dependencies = [
 name = "wizard-core"
 version = "0.1.0"
 dependencies = [
+ "proptest",
  "regex",
  "serde",
  "serde_json",
@@ -2269,6 +2270,7 @@ dependencies = [
 name = "wizard-index"
 version = "0.1.0"
 dependencies = [
+ "proptest",
  "rayon",
  "serde_json",
  "tempfile",
@@ -2322,6 +2324,7 @@ dependencies = [
 name = "wizard-parse"
 version = "0.1.0"
 dependencies = [
+ "proptest",
  "serde_json",
  "streaming-iterator",
  "tree-sitter",
@@ -2334,6 +2337,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "globset",
+ "proptest",
  "regex",
  "serde",
  "streaming-iterator",

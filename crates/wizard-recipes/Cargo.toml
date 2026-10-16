@@ -20,6 +20,7 @@ wizard-core.workspace = true
 wizard-parse.workspace = true
 
 [dev-dependencies]
+proptest.workspace = true
 tempfile.workspace = true
 
 [lints]
