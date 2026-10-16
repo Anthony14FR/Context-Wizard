@@ -2218,11 +2218,11 @@ dependencies = [
 
 [[package]]
 name = "wizard-budget"
-version = "0.3.0"
+version = "0.4.0"
 
 [[package]]
 name = "wizard-cli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "clap",
  "rusqlite",
@@ -2243,7 +2243,7 @@ dependencies = [
 
 [[package]]
 name = "wizard-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "proptest",
  "regex",
@@ -2254,21 +2254,21 @@ dependencies = [
 
 [[package]]
 name = "wizard-git"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "tempfile",
 ]
 
 [[package]]
 name = "wizard-graph"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "proptest",
 ]
 
 [[package]]
 name = "wizard-index"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "proptest",
  "rayon",
@@ -2288,7 +2288,7 @@ dependencies = [
 
 [[package]]
 name = "wizard-learn"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rusqlite",
  "tempfile",
@@ -2298,7 +2298,7 @@ dependencies = [
 
 [[package]]
 name = "wizard-lsp"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "serde_json",
  "tempfile",
@@ -2306,7 +2306,7 @@ dependencies = [
 
 [[package]]
 name = "wizard-mcp"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rmcp",
  "schemars",
@@ -2322,7 +2322,7 @@ dependencies = [
 
 [[package]]
 name = "wizard-parse"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "proptest",
  "serde_json",
@@ -2333,7 +2333,7 @@ dependencies = [
 
 [[package]]
 name = "wizard-recipes"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "blake3",
  "globset",
@@ -2350,7 +2350,7 @@ dependencies = [
 
 [[package]]
 name = "wizard-scan"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "ignore",
  "tempfile",
@@ -2358,7 +2358,7 @@ dependencies = [
 
 [[package]]
 name = "wizard-store"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "blake3",
  "rayon",
