@@ -80,6 +80,11 @@ function Install-Wizard {
         Get-ChildItem -LiteralPath $binDir -Filter 'wizard.exe.old.*' | Remove-Item -Force -ErrorAction SilentlyContinue
         Set-Content -NoNewline -LiteralPath "$currentFile.$PID" -Value $lock.version
         Move-Item -Force -LiteralPath "$currentFile.$PID" -Destination $currentFile
+        Get-ChildItem -LiteralPath $binDir -Directory |
+            Where-Object { $_.Name -ne $lock.version } |
+            Sort-Object LastWriteTimeUtc -Descending |
+            Select-Object -Skip 2 |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     } finally {
         Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $download, $staged
     }

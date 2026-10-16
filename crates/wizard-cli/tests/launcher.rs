@@ -1,5 +1,6 @@
 //! Tests of the plugin's polyglot `SessionStart` launcher in every shell Claude Code may use:
-//! hand-off to the installed binary, first-run download, checksum check and proxy support.
+//! hand-off to the installed binary, first-run download, checksum check, proxy support and
+//! retention of previous versions.
 //!
 //! Shell-form hook commands reach sh and bash unsubstituted, with `CLAUDE_PLUGIN_ROOT` in the
 //! environment, and reach PowerShell with the path substituted, as Claude Code runs them.
@@ -13,6 +14,7 @@ use std::process::{Command, Output, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
+use std::time::Duration;
 
 const PROMPT: &str = r#"{"hook_event_name":"UserPromptSubmit","prompt":"café ✓"}"#;
 const TARGETS: [&str; 6] = [
@@ -282,6 +284,44 @@ fn launcher_downloads_verifies_and_runs_the_binary() {
 }
 
 #[test]
+fn launcher_keeps_two_previous_versions() {
+    let server = serve_binary();
+    let sha = sha256(Path::new(env!("CARGO_BIN_EXE_wizard")));
+    let root = plugin_copy(&format!("http://{}/v1", server.address), &sha);
+    for shell in shells() {
+        let data = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let bin = data.path().join("bin");
+        for old in ["0.0.1", "0.0.2", "0.0.3", "0.0.4"] {
+            std::fs::create_dir_all(bin.join(old)).unwrap();
+            std::fs::write(bin.join(old).join(binary_name()), b"old").unwrap();
+            thread::sleep(Duration::from_millis(1100));
+        }
+        let launch = Launch {
+            root: root.path(),
+            data: data.path(),
+            project: project.path(),
+            env: Vec::new(),
+        };
+        assert_question(&shell, &launch.run(&shell));
+        let mut kept: Vec<String> = std::fs::read_dir(&bin)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().is_dir())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        kept.sort_unstable();
+        let mut expected = vec![
+            "0.0.3".to_owned(),
+            "0.0.4".to_owned(),
+            env!("CARGO_PKG_VERSION").to_owned(),
+        ];
+        expected.sort_unstable();
+        assert_eq!(kept, expected, "{shell:?}");
+    }
+}
+
+#[test]
 fn launcher_rejects_a_checksum_mismatch() {
     let server = serve_binary();
     let root = plugin_copy(&format!("http://{}/v1", server.address), &"0".repeat(64));
@@ -356,7 +396,7 @@ fn wait_until_executable(binary: &Path) {
     for _ in 0..40 {
         match Command::new(binary).arg("--version").output() {
             Err(error) if error.kind() == std::io::ErrorKind::ExecutableFileBusy => {
-                thread::sleep(std::time::Duration::from_millis(50));
+                thread::sleep(Duration::from_millis(50));
             }
             _ => return,
         }

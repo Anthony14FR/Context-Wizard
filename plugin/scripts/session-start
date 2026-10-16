@@ -58,6 +58,13 @@ wizard_place() {
     mv -f "${wizard_bin_dir}/current.$$" "${wizard_bin_dir}/current"
 }
 
+wizard_prune() {
+  (cd "$wizard_bin_dir" && ls -1dt -- */) 2>/dev/null | sed 's:/$::' | grep -vxF -- "$wizard_version" | sed '1,2d' |
+    while IFS= read -r wizard_stale; do
+      [ -n "$wizard_stale" ] && rm -rf -- "${wizard_bin_dir:?}/${wizard_stale}"
+    done
+}
+
 wizard_install() {
   wizard_url=$(wizard_json url)
   wizard_sha=$(wizard_json "$wizard_target")
@@ -81,10 +88,10 @@ if [ -n "$wizard_version" ] &&
   { [ ! -x "$wizard_bin" ] || [ "$(cat "${wizard_bin_dir}/current" 2>/dev/null)" != "$wizard_version" ]; }; then
   if wizard_install >/dev/null 2>&1; then
     rm -f "${wizard_bin_dir}/install-error"
+    wizard_prune
   else
     mkdir -p "$wizard_bin_dir" 2>/dev/null &&
-      printf '%s %s
-' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "download or verification of ${wizard_target} ${wizard_version} failed" > "${wizard_bin_dir}/install-error" 2>/dev/null
+      printf '%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "download or verification of ${wizard_target} ${wizard_version} failed" > "${wizard_bin_dir}/install-error" 2>/dev/null
   fi
 fi
 [ -x "$wizard_bin" ] || exit 0

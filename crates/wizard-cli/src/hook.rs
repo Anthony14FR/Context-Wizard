@@ -16,6 +16,7 @@ use crate::event::{Event, EventName};
 use crate::grep;
 use crate::install;
 use crate::opt_in;
+use crate::update;
 
 const MAX_INPUT_BYTES: u64 = 8 * 1024 * 1024;
 
@@ -50,7 +51,16 @@ fn respond(event: &Event) -> Option<String> {
             if decision.enabled && event.hook_event_name == EventName::SessionStart =>
         {
             let text = context::refreshed_overview(&project)?;
-            Some(additional_context("SessionStart", &text))
+            let mut output = json!({
+                "hookSpecificOutput": {
+                    "hookEventName": "SessionStart",
+                    "additionalContext": text,
+                }
+            });
+            if let Some(notice) = update::notice() {
+                output["systemMessage"] = json!(notice);
+            }
+            Some(output.to_string())
         }
         State::Decided(decision)
             if decision.enabled
