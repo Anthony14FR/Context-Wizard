@@ -1,6 +1,6 @@
 {
-  "name": "context-wizard",
-  "description": "Context Wizard: the right codebase context for Claude Code, at the right time, for the fewest tokens.",
+  "name": "context-wizard-beta",
+  "description": "Context Wizard prereleases, for early adopters: the right codebase context for Claude Code, at the right time, for the fewest tokens.",
   "owner": {
     "name": "Anthony14FR",
     "url": "https://github.com/Anthony14FR"
@@ -10,7 +10,12 @@
       "name": "context-wizard",
       "source": "./plugin",
       "category": "development",
-      "tags": ["context", "codebase", "repository-map", "tokens"]
+      "tags": [
+        "context",
+        "codebase",
+        "repository-map",
+        "tokens"
+      ]
     }
   ]
 }
