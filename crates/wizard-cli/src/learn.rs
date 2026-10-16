@@ -1,4 +1,6 @@
 //! Recording of hook events into the learning store of an enabled project.
+//!
+//! Each `Stop` also consolidates its session into learning signals.
 
 use std::path::{Component, Path};
 
@@ -16,6 +18,9 @@ pub(crate) fn record(project: &Path, event: &Event) {
         && let Ok(mut learn) = Learn::open_project(project)
     {
         let _ = learn.record(&learned);
+        if learned.kind == EventKind::Stop {
+            let _ = learn.consolidate(&learned.session);
+        }
     }
 }
 

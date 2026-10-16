@@ -401,4 +401,8 @@ fn enabled_projects_record_the_session_in_the_learning_store() {
         ]
     );
     assert!(learn.session("s1").unwrap().unwrap().ended.is_some());
+    let outcomes = learn.outcomes("s1").unwrap();
+    assert_eq!(outcomes.len(), 1);
+    assert!(outcomes[0].edited);
+    assert_eq!(learn.file_signals().unwrap()[0].useful, 1);
 }
