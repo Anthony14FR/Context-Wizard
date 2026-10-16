@@ -5,7 +5,7 @@ description: Navigate a project indexed by Context Wizard with its MCP tools ins
 
 # Navigating with Context Wizard
 
-The project overview injected at session start already names the stack, entry points, commands and folders. Start from it instead of listing directories.
+The project overview injected at session start already names the stack, entry points, commands and folders. Start from it instead of listing directories. When a prompt arrives with predicted files, read those first: they come from the code structure and from what past sessions edited for similar tasks.
 
 Prefer the Context Wizard MCP tools to Grep, Glob and bulk Read when the question is about code structure:
 
@@ -17,6 +17,7 @@ Prefer the Context Wizard MCP tools to Grep, Glob and bulk Read when the questio
 | What does this file contain, without reading all of it? | `explain` with the path |
 | What could break if I change this file? | `impact` with the path |
 | Where does the important code live? | `map` |
+| Which routes, models, schema, components, pages or screens exist? | `facts`, optionally with a kind such as `routes` |
 
 Then read only the lines you need, with an offset and a limit around the line numbers the tools give.
 
