@@ -11,6 +11,7 @@ mod learn;
 mod map;
 mod opt_in;
 mod prediction;
+mod purge;
 mod recipes;
 mod serve;
 mod stats;
@@ -64,6 +65,15 @@ enum Command {
         #[arg(long)]
         project: Option<PathBuf>,
     },
+    /// Deletes the index and learning data of a project, and with `--all` its decision too.
+    Purge {
+        /// Also delete the decision and the settings override.
+        #[arg(long)]
+        all: bool,
+        /// Project root. Defaults to the current directory.
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+    },
     /// Lists the framework recipes of a project and checks them, failing on a broken recipe.
     Recipes {
         /// Project root. Defaults to the current directory.
@@ -105,6 +115,7 @@ fn main() -> ExitCode {
         Some(Command::Index { project }) => index::run(&project),
         Some(Command::Map { level, project }) => map::run(&project, level),
         Some(Command::Serve { project }) => serve::run(project),
+        Some(Command::Purge { all, project }) => purge::run(&project, all),
         Some(Command::Recipes { project }) => recipes::run(&project),
         Some(Command::Stats { project }) => stats::run(&project),
         Some(Command::Status { project }) => status::run(&project),

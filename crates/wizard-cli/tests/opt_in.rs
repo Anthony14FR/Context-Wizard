@@ -446,3 +446,44 @@ def handler():
     assert!(predictions[0].shown);
     assert_eq!(predictions[0].files[0], "src/billing.py");
 }
+
+fn purge_with(binary: &Path, project: &Path, all: bool) -> Output {
+    let mut command = Command::new(binary);
+    command.args(["purge", "--project"]).arg(project);
+    if all {
+        command.arg("--all");
+    }
+    command.output().unwrap()
+}
+
+#[test]
+fn purge_deletes_project_data_and_optionally_the_decision() {
+    let (_root, binary) = installed_binary("context-wizard-context-wizard");
+    let project = tempfile::tempdir().unwrap();
+    std::fs::write(project.path().join("lib.rs"), "fn main() {}\n").unwrap();
+    assert!(decide_with(&binary, project.path(), "on").status.success());
+    assert!(project.path().join(".wizard/index.db").exists());
+
+    let kept = purge_with(&binary, project.path(), false);
+    assert!(kept.status.success(), "{kept:?}");
+    assert!(!project.path().join(".wizard").exists());
+    assert!(project.path().join(".claude/wizard.json").exists());
+    assert!(String::from_utf8_lossy(&kept.stdout).contains("learning starts over"));
+
+    assert!(decide_with(&binary, project.path(), "off").status.success());
+    let settings = project.path().join(".claude/settings.local.json");
+    assert!(
+        std::fs::read_to_string(&settings)
+            .unwrap()
+            .contains("context-wizard@context-wizard")
+    );
+    let all = purge_with(&binary, project.path(), true);
+    assert!(all.status.success(), "{all:?}");
+    assert!(!project.path().join(".claude/wizard.json").exists());
+    assert!(
+        !std::fs::read_to_string(&settings)
+            .unwrap()
+            .contains("context-wizard@context-wizard")
+    );
+    assert!(String::from_utf8_lossy(&all.stdout).contains("asks again"));
+}
