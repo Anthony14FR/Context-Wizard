@@ -1,0 +1,32 @@
+name: Directory branch
+
+on:
+  push:
+    branches: [main]
+    paths: [plugin/**]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  split:
+    name: Update the directory branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Split the plugin folder and push it
+        run: |
+          git subtree split --prefix=plugin HEAD -b directory
+          if git cat-file -e directory:.gitattributes 2>/dev/null; then
+            echo "the plugin folder must not hold a .gitattributes file: the directory refuses attributes that rewrite content"
+            exit 1
+          fi
+          git push origin directory
