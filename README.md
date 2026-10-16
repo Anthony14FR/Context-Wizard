@@ -66,6 +66,18 @@ At the next session start, the plugin downloads the `wizard` binary for your pla
 
 To receive updates automatically, open `/plugin`, go to **Marketplaces** and choose **Enable auto-update**. Claude Code leaves this off by default for third-party marketplaces. Otherwise, Context Wizard shows a one-line notice when a new release is out.
 
+### Beta channel
+
+Prereleases ship first to a second marketplace, `context-wizard-beta`, built from the `next` branch. To try them, uninstall the stable plugin first, since both would run their hooks:
+
+```sh
+claude plugin uninstall context-wizard@context-wizard --keep-data
+claude plugin marketplace add Anthony14FR/Context-Wizard#next
+claude plugin install context-wizard@context-wizard-beta
+```
+
+To go back, uninstall `context-wizard@context-wizard-beta` and install `context-wizard@context-wizard` again. Project data is shared by both channels.
+
 ## Usage
 
 Answer the question on the first prompt of a project, then work as usual. Commands:

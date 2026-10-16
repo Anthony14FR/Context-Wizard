@@ -66,6 +66,18 @@ Au démarrage de session suivant, le plugin télécharge le binaire `wizard` de 
 
 Pour recevoir les mises à jour automatiquement, ouvrez `/plugin`, allez dans **Marketplaces** et choisissez **Enable auto-update**. Claude Code laisse cette option désactivée par défaut pour les marketplaces tierces. Sinon, Context Wizard affiche une ligne d'avis quand une nouvelle version sort.
 
+### Canal bêta
+
+Les préversions sortent d'abord sur une seconde marketplace, `context-wizard-beta`, construite depuis la branche `next`. Pour les essayer, désinstallez d'abord le plugin stable, car les deux exécuteraient leurs hooks :
+
+```sh
+claude plugin uninstall context-wizard@context-wizard --keep-data
+claude plugin marketplace add Anthony14FR/Context-Wizard#next
+claude plugin install context-wizard@context-wizard-beta
+```
+
+Pour revenir en arrière, désinstallez `context-wizard@context-wizard-beta` et réinstallez `context-wizard@context-wizard`. Les données de projet sont communes aux deux canaux.
+
 ## Utilisation
 
 Répondez à la question au premier prompt d'un projet, puis travaillez comme d'habitude. Commandes :
