@@ -38,6 +38,7 @@ pub(crate) fn run(project: &Path, all: bool) -> ExitCode {
             remove_file(&decision::path(project)),
         );
         if let Some(plugin_id) = install::plugin_id() {
+            let _ = settings::set_tools_allowed(project, &install::tools_rule(&plugin_id), false);
             match settings::set_plugin_enabled(project, &plugin_id, true) {
                 Ok(()) => println!(
                     "Removed any Context Wizard override from {}.",

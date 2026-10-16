@@ -19,6 +19,8 @@ use crate::atomic;
 pub const RELATIVE_PATH: &str = ".claude/settings.local.json";
 
 const ENABLED_PLUGINS: &str = "enabledPlugins";
+const PERMISSIONS: &str = "permissions";
+const ALLOW: &str = "allow";
 
 /// Failure to update the local settings file.
 #[derive(Debug)]
@@ -88,14 +90,69 @@ pub fn set_plugin_enabled(
     plugin_id: &str,
     enabled: bool,
 ) -> Result<(), SettingsError> {
+    update(project, |settings, path| {
+        if enabled {
+            remove_override(settings, plugin_id, path)
+        } else {
+            add_override(settings, plugin_id, path)
+        }
+    })
+}
+
+/// Allows the tools matched by `rule` without a permission prompt in `project`, or removes
+/// that rule when `allowed` is `false`. Other rules are left as they are.
+///
+/// # Errors
+///
+/// Returns an error when the file cannot be read or written, or does not hold a JSON object
+/// with an object `permissions` and an array `allow`.
+pub fn set_tools_allowed(project: &Path, rule: &str, allowed: bool) -> Result<(), SettingsError> {
+    update(project, |settings, path| {
+        let not_an_object = || SettingsError::NotAnObject {
+            path: path.to_owned(),
+        };
+        if !allowed && !settings.contains_key(PERMISSIONS) {
+            return Ok(false);
+        }
+        let permissions = settings
+            .entry(PERMISSIONS)
+            .or_insert_with(|| Value::Object(Map::new()))
+            .as_object_mut()
+            .ok_or_else(not_an_object)?;
+        if !allowed && !permissions.contains_key(ALLOW) {
+            return Ok(false);
+        }
+        let rules = permissions
+            .entry(ALLOW)
+            .or_insert_with(|| Value::Array(Vec::new()))
+            .as_array_mut()
+            .ok_or_else(not_an_object)?;
+        let present = rules.iter().any(|known| known.as_str() == Some(rule));
+        if allowed == present {
+            return Ok(false);
+        }
+        if allowed {
+            rules.push(Value::String(rule.to_owned()));
+        } else {
+            rules.retain(|known| known.as_str() != Some(rule));
+            if rules.is_empty() {
+                permissions.shift_remove(ALLOW);
+            }
+            if permissions.is_empty() {
+                settings.shift_remove(PERMISSIONS);
+            }
+        }
+        Ok(true)
+    })
+}
+
+fn update(
+    project: &Path,
+    change: impl FnOnce(&mut Map<String, Value>, &Path) -> Result<bool, SettingsError>,
+) -> Result<(), SettingsError> {
     let path = project.join(RELATIVE_PATH);
     let mut settings = read_object(&path)?;
-    let changed = if enabled {
-        remove_override(&mut settings, plugin_id, &path)?
-    } else {
-        add_override(&mut settings, plugin_id, &path)?
-    };
-    if !changed {
+    if !change(&mut settings, &path)? {
         return Ok(());
     }
     let io_error = |source| SettingsError::Io {
@@ -177,7 +234,33 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::{RELATIVE_PATH, set_plugin_enabled};
+    use super::{RELATIVE_PATH, set_plugin_enabled, set_tools_allowed};
+
+    #[test]
+    fn adds_and_removes_one_allow_rule() {
+        let project = tempfile::tempdir().unwrap();
+        write(
+            project.path(),
+            r#"{"permissions":{"allow":["Bash(npm test)"]},"model":"x"}"#,
+        );
+        set_tools_allowed(project.path(), "mcp__x__*", true).unwrap();
+        set_tools_allowed(project.path(), "mcp__x__*", true).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&read(project.path())).unwrap();
+        assert_eq!(
+            value["permissions"]["allow"],
+            serde_json::json!(["Bash(npm test)", "mcp__x__*"])
+        );
+        set_tools_allowed(project.path(), "mcp__x__*", false).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&read(project.path())).unwrap();
+        assert_eq!(
+            value["permissions"]["allow"],
+            serde_json::json!(["Bash(npm test)"])
+        );
+        assert_eq!(value["model"], "x");
+        let empty = tempfile::tempdir().unwrap();
+        set_tools_allowed(empty.path(), "mcp__x__*", false).unwrap();
+        assert!(!empty.path().join(RELATIVE_PATH).exists());
+    }
 
     const ID: &str = "context-wizard@context-wizard";
 

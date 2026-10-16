@@ -150,10 +150,12 @@ fn disabling_from_a_plugin_install_adds_the_settings_override() {
             serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
         assert_eq!(value["enabledPlugins"][id], false);
         assert!(decide_with(&binary, project.path(), "on").status.success());
+        let value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
+        assert!(value.get("enabledPlugins").is_none(), "{value}");
         assert_eq!(
-            std::fs::read_to_string(&settings).unwrap(),
-            "{}
-"
+            value["permissions"]["allow"],
+            serde_json::json!(["mcp__plugin_context-wizard_context-wizard__*"])
         );
     }
 }
@@ -473,6 +475,11 @@ fn purge_deletes_project_data_and_optionally_the_decision() {
     assert!(decide_with(&binary, project.path(), "off").status.success());
     let settings = project.path().join(".claude/settings.local.json");
     assert!(
+        !std::fs::read_to_string(&settings)
+            .unwrap()
+            .contains("mcp__plugin_")
+    );
+    assert!(
         std::fs::read_to_string(&settings)
             .unwrap()
             .contains("context-wizard@context-wizard")
@@ -486,4 +493,23 @@ fn purge_deletes_project_data_and_optionally_the_decision() {
             .contains("context-wizard@context-wizard")
     );
     assert!(String::from_utf8_lossy(&all.stdout).contains("asks again"));
+}
+
+#[test]
+fn enabling_allows_the_plugin_tools_and_disabling_removes_them() {
+    let (_root, binary) = installed_binary("context-wizard-context-wizard");
+    let project = tempfile::tempdir().unwrap();
+    assert!(decide_with(&binary, project.path(), "on").status.success());
+    let settings = project.path().join(".claude/settings.local.json");
+    assert!(
+        std::fs::read_to_string(&settings)
+            .unwrap()
+            .contains("mcp__plugin_context-wizard_context-wizard__*")
+    );
+    assert!(decide_with(&binary, project.path(), "off").status.success());
+    assert!(
+        !std::fs::read_to_string(&settings)
+            .unwrap()
+            .contains("mcp__plugin_")
+    );
 }
