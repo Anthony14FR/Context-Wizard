@@ -1,7 +1,7 @@
 {
   "name": "context-wizard",
   "displayName": "Context Wizard",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Gives Claude the right codebase context at the right time, for the fewest tokens, on any project.",
   "author": {
     "name": "Anthony14FR",
